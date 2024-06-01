@@ -175,6 +175,8 @@ Changelog
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### Unreleased (on current HEAD of the Projection branch)
+## Added
+- Added a check in `Read_shapefile.m` to handle, warn, and correct cases where there are empty objects in a shapefile. https://github.com/CHLNDDEV/OceanMesh2D/pull/315
 
 ### [6.0.0] - 2024-02-28
 ## Added
