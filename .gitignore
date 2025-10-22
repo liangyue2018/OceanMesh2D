@@ -1,5 +1,9 @@
 # folder
+.github/
 datasets/
+imgs/
+Tests/
+UserGuide/
 Examples/project_TW/*
 
 # large data
