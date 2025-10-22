@@ -1,12 +1,19 @@
-m_map/
+# folder
 datasets/
-fort.*
-Examples/*
-!Examples/Example_*
-!Examples/runall.m
-*/*.mat
-*.15
-*.14
-*.13
-*.24
+Examples/project_TW/*
+
+# large data
+*.mat
 *.nc
+*.h5
+*.zip
+
+# shapefile
+*.shp
+*.shx
+*.dbf
+*.prj
+*.kml
+
+# Allow explicit tracking of this file
+!.gitignore

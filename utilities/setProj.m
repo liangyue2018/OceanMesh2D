@@ -31,7 +31,7 @@ function [del,obj] = setProj(obj,proj,projtype,insert,bbox)
     % process the projtype as a varargin type
     I = find(strcmp(projtype,'long'));
     if ~isempty(I)
-        if length(projtype{I+1}) == 1
+        if isscalar(projtype{I+1})
             lon_mea = projtype{I+1};
         else
             lon_mi = projtype{I+1}(1); lon_ma = projtype{I+1}(2);
@@ -39,7 +39,7 @@ function [del,obj] = setProj(obj,proj,projtype,insert,bbox)
     end
     I = find(strcmp(projtype,'lat'));
     if ~isempty(I)
-        if length(projtype{I+1}) == 1
+        if isscalar(projtype{I+1})
             lat_mea = projtype{I+1};
         else
             lat_mi = projtype{I+1}(1); lat_ma = projtype{I+1}(2);
@@ -62,7 +62,7 @@ function [del,obj] = setProj(obj,proj,projtype,insert,bbox)
             projtype = projtype{1};
         end
         projtype = lower(projtype);
-        if ~isempty(regexp(projtype,'ste'))
+        if ~isempty(regexp(projtype, 'ste', 'once'))
             % Special treatment of Stereographic projection
             if lat_ma < 0
                 % center Antarctica
@@ -76,15 +76,15 @@ function [del,obj] = setProj(obj,proj,projtype,insert,bbox)
                       'radius',min(90-lat_mi,180),'rot',rot);
             end
             m_proj('get') ;
-        elseif  ~isempty(regexp(projtype,'ort')) || ...
-                ~isempty(regexp(projtype,'gno')) || ...
-                ~isempty(regexp(projtype,'azi')) || ...
-                ~isempty(regexp(projtype,'sat'))
+        elseif  ~isempty(regexp(projtype, 'ort', 'once')) || ...
+                ~isempty(regexp(projtype, 'gno', 'once')) || ...
+                ~isempty(regexp(projtype, 'azi', 'once')) || ...
+                ~isempty(regexp(projtype, 'sat', 'once'))
             m_proj(projtype,'lat',lat_mea,'long',lon_mea,...
                    'radius',rad,'rot',rot);
             m_proj('get') ;
             del = 1;
-        elseif ~isempty(regexp(projtype,'obl')) 
+        elseif ~isempty(regexp(projtype, 'obl', 'once'))
             % Oblique Mercator projection
             asp = (lon_ma-lon_mi)/(lat_ma - lat_mi);
             dir = 'hor';
@@ -101,7 +101,7 @@ function [del,obj] = setProj(obj,proj,projtype,insert,bbox)
             del = 1;
             m_proj(projtype,'lon',[lon_mi lon_ma],...
                             'lat',[lat_mi lat_ma]) ;
-            m_proj('get') ;
+            %m_proj('get') ;
         end
     end
     if insert

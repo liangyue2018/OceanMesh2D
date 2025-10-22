@@ -86,6 +86,8 @@ classdef edgefx
         
         min_el_ch % min. element size along the channel
         Channels % cell array of streams.
+
+        ns_dist % distance to the coast (added by lcao on Jul 2025)
         
     end
     
@@ -131,6 +133,8 @@ classdef edgefx
             addOptional(p,'fl',defval);
             addOptional(p,'Channels',defval);
             addOptional(p,'h0',defval);
+
+            addOptional(p,'ns_dist',defval);
             
             % parse the inputs
             parse(p,varargin{:});
@@ -140,7 +144,7 @@ classdef edgefx
             inp = orderfields(inp,{'max_el','min_el_ch','AngOfRe',...
                 'geodata','lmsl','Channels',...
                 'dis','fs','fl','g','max_el_ns',...
-                'wl','slp','ch','dt','h0'});
+                'wl','slp','ch','dt','h0','ns_dist'});
             fields = fieldnames(inp);
             % loop through and determine which args were passed.
             % also, assign reasonable default values if some options were
@@ -206,6 +210,12 @@ classdef edgefx
                         if ~isempty(obj.Channels) ~=0
                             obj.Channels = inp.(fields{i});
                         end
+                    case('ns_dist')
+                        obj.ns_dist=inp.(fields{i});
+                        if obj.ns_dist ~= 0
+                            assert(obj.ns_dist>0,'Raised by ns_dist < 0');
+                            obj.ns_dist=inp.(fields{i});
+                        end
                 end
             end
             
@@ -269,7 +279,7 @@ classdef edgefx
                             obj.used{end+1} = 'ch';
                         end
                     case{'g','geodata','lmsl','max_el','min_el_ch',...
-                            'Channels','max_el_ns','h0','dt','fl','AngOfRe'}
+                            'Channels','max_el_ns','h0','dt','fl','AngOfRe','ns_dist'}
                         % dummy to avoid warning
                     otherwise
                         warning('Unexpected edge function name/value pairs.')
@@ -837,7 +847,11 @@ classdef edgefx
             
             % enforce all mesh resolution bounds,grade and enforce the CFL in planar metres
             if ~isinf(obj.max_el_ns) && ~isempty(obj.boudist)
-                nearshore = abs(obj.boudist) < 2/3*obj.h0;
+                if obj.ns_dist ~= 0
+                    nearshore = abs(obj.boudist) < obj.ns_dist;
+                else
+                    nearshore = abs(obj.boudist) < 2/3*obj.h0;
+                end
                 hh_m(nearshore & hh_m > obj.max_el_ns) = obj.max_el_ns;
             end
             hh_m(hh_m < obj.h0 ) = obj.h0;

@@ -1,7 +1,7 @@
 function H = m_tricontour(tri,p,z,N,C)
 %   H = m_tricontour(tri,p,z,N,C)
-%   N-> number of contour levels
-%   C-> linespec color
+%   N-> levels
+%   C-> linestyle color
 global MAP_PROJECTION
 
 % Have to have initialized a map first

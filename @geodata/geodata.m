@@ -306,7 +306,7 @@ classdef geodata
             % Ensure inpoly flip is correct
             obj = check_connectedness_inpoly(obj);
             
-            disp(['Read in meshing boundary: ',obj.contourfile]);
+            disp(['Read in meshing boundary: ',obj.contourfile{1}]);
             
             if obj.BACKUPdemfile~=0
                 obj = ParseDEM(obj,'BackUp') ;
@@ -609,7 +609,7 @@ classdef geodata
                 finfo = ncinfo(fname);
                 for ii = 1:length(finfo.Variables)
                     if ~isempty(xvn) && ~isempty(yvn) && ~isempty(zvn); break; end
-                    if length(finfo.Variables(ii).Size) == 1
+                    if isscalar(finfo.Variables(ii).Size)
                         if isempty(xvn) && ...
                                 any(strcmp(finfo.Variables(ii).Name,wkv_x))
                             xvn = finfo.Variables(ii).Name;
@@ -856,7 +856,7 @@ classdef geodata
                 0.5*obj.h0/111e3);
             m_plot(lo,la,'k--','linewi',2);
             if ~holdon
-                m_grid('xtick',10,'tickdir','out','yaxislocation','left','fontsize',10);
+                m_grid('xtick',10,'tickdir','out','yaxislocation','left');
             end
             if exist('h1','var') && exist('h2','var') && exist('h3','var')
                 legend([h1 h2,h3],{'mainland' 'inner' 'weirs'},'Location','NorthWest')

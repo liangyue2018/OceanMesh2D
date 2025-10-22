@@ -1093,10 +1093,10 @@ classdef meshgen
                 % plot the line dividing cleanup and distmesh
                 plot([it it],[0 1],'--k')
                 xticks(1:5:obj.itmax);
-                xlabel('Iterations'); ylabel('Geometric element quality');
+                xlabel('Meshing iterations'); ylabel('Geometric element quality');
                 title('Geometric element quality with iterations');
                 set(gca,'FontSize',14);
-                legend('q_{mean}','q_{mean}-q_{3\sigma}', 'q_{min}','Location','best');
+                legend('$\bar{q_E}$','$\bar{q_E}-3\sigma_{q_E}$','$q_{min}$','Location','best',Interpreter='latex');
                 grid minor
             end
             return;

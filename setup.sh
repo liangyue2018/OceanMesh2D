@@ -10,7 +10,7 @@
 # checks for their existance too
 # set to 'true' to download
 
-m_map=true  # m_map mapping toolbox (reqd)
+m_map=false  # m_map mapping toolbox (reqd)
 gshhs=true  # global shoreline
 srtm=true   # SRTM15+V2.1 global bathymetry -> {user can select
 gebco=false  # GEBCO_2020 global bathymetry  -> {desired source
@@ -49,7 +49,7 @@ if $gshhs; then
         if [ ! -f "gshhs.zip" ]; then 
             wget --no-check-certificate --no-hsts "http://www.soest.hawaii.edu/pwessel/gshhg/gshhg-shp-2.3.7.zip" -O gshhs.zip
         fi
-        unzip -q gshhs.zip "GSHHS_shp/*"
+        unzip -q gshhs.zip "GSHHS_shp/**"
         if ! $keepzip; then rm gshhs.zip; fi
     fi
 else

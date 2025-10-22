@@ -305,8 +305,8 @@ classdef msh
         end
         
         % general plot function
-        function h = plot(obj,varargin)
-            % h = plot(obj,varargin)
+        function [h, cb] = plot(obj,varargin)
+            % [h, cb] = plot(obj,varargin)
             %
             % 1) obj: msh object
             %
@@ -358,7 +358,7 @@ classdef msh
             %                    (each option has different default)
             %                    type 'help cmocean' to see all the colormaps
             %                    available
-            
+
             fsz = 12; % default font size
             bgc = [1 1 1]; % default background color
             cmap_int = 10; % default num of colormap intervals
@@ -368,6 +368,8 @@ classdef msh
             axis_limits = []; % use mesh extents to determine plot extents
             cmap = 1; % default value is specified in plot method
             leg_ind = [];
+            h = [];
+            cb = [];
             
             projtype = [];
             type = 'tri';
@@ -478,8 +480,7 @@ classdef msh
                         simpplot(obj.p,obj.t);
                     end
                 case('bd')
-                    legend_names = {'open ocean boundary','outer no-flux boundary',...
-                        'inner no-flux boundary','subgrid scale barriers'};
+                    legend_names = {'open ocean','outer no-flux','inner no-flux','subgrid scale barriers'};
                     if tri
                         if proj
                             m_triplot(obj.p(:,1),obj.p(:,2),obj.t);
@@ -553,9 +554,9 @@ classdef msh
                 case('ob') % outer boundary of mesh
                     [~,bpt] = extdom_edges2(obj.t,obj.p);
                     if proj
-                        m_plot(bpt(:,1),bpt(:,2),'r.');
+                        m_plot(bpt(:,1),bpt(:,2),'r.',MarkerSize=3);
                     else
-                        plot(bpt(:,1),bpt(:,2),'r.');
+                        plot(bpt(:,1),bpt(:,2),'r.',MarkerSize=3);
                     end
                 case('b')
                     if logaxis
@@ -566,7 +567,7 @@ classdef msh
                     if cmap == 1
                         cmap = '-topo';
                     end
-                    plotter(cmap,1,'depth below datum [m]',true);
+                    cb=plotter(cmap,0,'depth [m]',true);
                     title('mesh topo-bathy');
                 case('slp')
                     slp = hypot(obj.bx,obj.by);
@@ -619,7 +620,7 @@ classdef msh
                     if cmap == 1
                         cmap = 'thermal';
                     end
-                    plotter(cmap,0,yylabel,false);
+                    cb=plotter(cmap,0,yylabel,false);
                     title('mesh resolution');
                 case('resodx')
                     TR = triangulation(obj.t,obj.p(:,1),obj.p(:,2));
@@ -659,7 +660,7 @@ classdef msh
                     if cmap == 1
                         cmap = 'matter';
                     end
-                    plotter(cmap,3,'area-length ratio',false);
+                    cb=plotter(cmap,3,'area-length ratio',false);
                     title('Mesh quality metric');
                 case('sponge')
                     ii = find(contains({obj.f13.defval.Atr(:).AttrName},'sponge'));
@@ -761,10 +762,10 @@ classdef msh
                 m_grid('FontSize',fsz,'bac',bgc);
             end
             if ~isempty(leg_ind)
-                legend(h(leg_ind),legend_names(leg_ind),'location','best')
+                legend(h(leg_ind),legend_names(leg_ind));
             end
             
-            function plotter(cmap,round_dec,yylabel,apply_pivot)
+            function cb = plotter(cmap,round_dec,yylabel,apply_pivot)
                 % applies the plot for the quantiy 'q' and specific
                 % colormap/colorbar inputs
                 if proj
@@ -786,30 +787,27 @@ classdef msh
                 cb = colorbar;
                 if logaxis
                     if length(cmap_int) >= 3
-                        desiredTicks = round(10.^(linspace(...
-                            log10(cmap_int(2)),...
-                            log10(cmap_int(3)),numticks)),round_dec);
+                        desiredTicks = logspace(log10(cmap_int(2)), ...
+                                                log10(cmap_int(3)), ...
+                                                numticks);
                     else
-                        desiredTicks = round(10.^(linspace(min(q),...
-                            max(q),numticks)),round_dec);
+                        desiredTicks = logspace(min(q), max(q), numticks);
                     end
-                    caxis([log10(min(desiredTicks)) log10(max(desiredTicks))]);
-                    cb.Ticks     = log10(desiredTicks);
+                    clim([log10(min(desiredTicks)) log10(max(desiredTicks))]);
+                    cb.Ticks = log10(desiredTicks);
                     for tck = 1 : length(desiredTicks)
-                        cb.TickLabels{tck} = num2str(desiredTicks(tck));
+                        cb.TickLabels{tck} = num2str(round(desiredTicks(tck), round_dec));
                     end
                 else
                     if length(cmap_int) >= 3
-                        desiredTicks = round(linspace(cmap_int(2),...
-                            cmap_int(3),numticks),round_dec);
+                        desiredTicks = linspace(cmap_int(2), cmap_int(3), numticks);
                     else
-                        desiredTicks = round(linspace(min(q),...
-                            max(q),numticks),round_dec);
+                        desiredTicks = linspace(min(q), max(q), numticks);
                     end
-                    caxis([min(desiredTicks) max(desiredTicks)]);
+                    clim([min(desiredTicks) max(desiredTicks)]);
                     cb.Ticks = desiredTicks;
                     for tck = 1 : length(desiredTicks)
-                        cb.TickLabels{tck} = num2str(desiredTicks(tck));
+                        cb.TickLabels{tck} = num2str(round(desiredTicks(tck), round_dec));
                     end
                 end
                 if apply_pivot
@@ -1571,14 +1569,14 @@ classdef msh
                                     nope = nope + 1;
                                     nvdll(nope) = length(idv_t);
                                     neta = neta + nvdll(nope);
-                                    ibtype(nope) = 0;
+                                    ibtype1(nope) = 0;
                                     nbdv(1:nvdll(nope),nope) = idv_t';
                                 else
                                     % make this segment ocean
                                     nbou = nbou + 1;
                                     nvell(nbou) = length(idv_t);
                                     nvel = nvel + nvell(nbou);
-                                    ibtype(nbou) = 20;
+                                    ibtype2(nbou) = 20;
                                     nbvv(1:nvell(nbou),nbou) = idv_t';
                                 end
                             end
@@ -1591,7 +1589,7 @@ classdef msh
                             nvell(nbou) = length(idv);
                             nvel = nvel + nvell(nbou);
                             nbvv(1:nvell(nbou),nbou) = idv';
-                            ibtype(nbou) = 21;
+                            ibtype2(nbou) = 21;
                         end
                     end
                     
@@ -1601,7 +1599,7 @@ classdef msh
                         obj.op.nope = nope ;
                         obj.op.neta = neta ;
                         obj.op.nvdll = nvdll ;
-                        obj.op.ibtype = ibtype ;
+                        obj.op.ibtype = ibtype1 ;
                         obj.op.nbdv = nbdv;
                     end
                     
@@ -1610,7 +1608,7 @@ classdef msh
                         obj.bd.nbou = nbou ;
                         obj.bd.nvel = nvel ;
                         obj.bd.nvell = nvell ;
-                        obj.bd.ibtype = ibtype ;
+                        obj.bd.ibtype = ibtype2 ;
                         obj.bd.nbvv = nbvv ;
                     end
                     
