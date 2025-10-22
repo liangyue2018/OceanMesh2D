@@ -19,5 +19,9 @@ Examples/project_TW/*
 *.prj
 *.kml
 
+# log file
+*.out
+*.log
+
 # Allow explicit tracking of this file
 !.gitignore
