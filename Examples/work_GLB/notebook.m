@@ -6,9 +6,9 @@ fnm = "D:\soft\OceanMesh2D\datasets\GSHHS_shp\" + reso + '\GSHHS_' + reso + '_L1
 GT = readgeotable(fnm);
 
 % subset
-latlim = [-60 67];
+latlim = [-60 66];
 lonlim = [-180 180];
-shape = geoclip(GT.Shape, latlim, lonlim);
+shape = geoclip(GT.Shape, [latlim(1)-.5 latlim(2)+.5], lonlim);
 idx = shape.NumRegions ~= 0;
 shape = shape(idx);
 
@@ -34,23 +34,41 @@ GT = table(shapeout, VariableNames={'Shape'});
 T = geotable2table(GT, ["Lat","Lon"]);
 [latb, lonb] = polyjoin(T.Lat, T.Lon);
 
+% remove some land polygons
+latq = [65.95 65.95 65.95 65.98]; 
+lonq = [-174 -162 44 72];
+[latcells, loncells] = polysplit(latb, lonb);
+ploc = true(size(latcells));
+for i = 1:length(latcells)
+    [in, on] = inpolygon(lonq, latq, loncells{i}, latcells{i});
+    if any(in)
+        ploc(i) = false;
+    end
+    assert(nnz(on) == 0, 'Error: Query points are on the edge');
+end
+assert(nnz(~ploc) == length(latq), 'Error: Check query points');
+latcells = latcells(ploc);
+loncells = loncells(ploc);
+[latb, lonb] = polyjoin(latcells, loncells);
+
 % simplify
 [latb, lonb, err, tol] = reducem(latb, lonb, .1);
-fprintf('Simplify coastal polygon (Npts=%d) with tol=%.2f deg, err=%.1f%%.\n', ... %[output:group:3878cf5f] %[output:3ddc1177]
-    numel(latb), tol, err*100); %[output:group:3878cf5f] %[output:3ddc1177]
+fprintf('Simplify coastal polygon (Npts=%d) with tol=%.2f deg, err=%.1f%%.\n', ... %[output:group:3232e88e] %[output:193b5451]
+    numel(latb), tol, err*100); %[output:group:3232e88e] %[output:193b5451]
 shapeout = geopolyshape(latb, lonb);
 shapeout.GeographicCRS = geocrs(4326);
 
-bbox = {[-180 180;27 66]
-        [-180 180;-27 27]
-        [-180 180;-90 -27]};
+% split into 3 parts by latitudes
+latbnd = [-27 27];
+bbox = {[-180 180;latbnd(2) latlim(2)]
+        [-180 180;latbnd]
+        [-180 180;latlim(1) latbnd(1)]};
 shapeoutC = cell(3,1);
 for i = 1:numel(bbox)
     bnd = bbox2poly(bbox{i});
     reg = geopolyshape(bnd(:,2), bnd(:,1));
     reg.GeographicCRS = geocrs(4326);
     shapeoutC{i} = intersect(shapeout, reg);
-    %shapeoutC{i} = geoclip(shapeout, bbox{i}(2,:), bbox{i}(1,:));
 end
 
 % save and write shapefile
@@ -78,13 +96,14 @@ filepath = "./G" + datestr(1:4) + '/' ...
 fList = dir(filepath + '*.h5');
 filename = {fList.name}';
 fnm = fullfile(filepath, filename);
+assert(~isempty(fnm), 'ERROR: No h5 files in %s', filepath);
 
 % read h5file
 gtx = {'gt1r' 'gt2r' 'gt3r'};
 kw = {1 Inf 100};
 S = struct;
-for n = 1:numel(fnm) %[output:group:8cc1cbd2]
-    fprintf('Processing file %d of %d: %s\n', n, numel(fnm), fnm{n}); %[output:61549d4c]
+for n = 1:numel(fnm) %[output:group:78b7b4fe]
+    fprintf('Processing file %d of %d: %s\n', n, numel(fnm), fnm{n}); %[output:813c60bd]
     for rn = gtx
         try
             lon_ph = h5read(fnm{n}, "/" + rn{1} + '/heights/lon_ph', kw{:});
@@ -95,7 +114,7 @@ for n = 1:numel(fnm) %[output:group:8cc1cbd2]
             fprintf('    Error reading %s: %s\n', fnm{n}, rn{1});
         end
     end
-end %[output:group:8cc1cbd2]
+end %[output:group:78b7b4fe]
 
 % save result
 sfnm = ['is2_granules_' datestr '.mat'];
@@ -114,7 +133,7 @@ fig.Position(4) = 8;
 gx = geoaxes;
 hold on;
 geoplot(gx, shape, FaceColor='k', ...
-                   FaceAlpha=.5, ...
+                   FaceAlpha=.3, ...
                    EdgeColor='k', ...
                    EdgeAlpha=.5);
 geoplot(gx, shapeout, FaceColor='b', ...
@@ -141,9 +160,9 @@ end
 %[metadata:view]
 %   data: {"layout":"inline"}
 %---
-%[output:3ddc1177]
-%   data: {"dataType":"text","outputData":{"text":"Simplify coastal polygon (Npts=4067) with tol=0.10 deg, err=1.1%.\n","truncated":false}}
+%[output:193b5451]
+%   data: {"dataType":"text","outputData":{"text":"Simplify coastal polygon (Npts=3956) with tol=0.10 deg, err=1.1%.\n","truncated":false}}
 %---
-%[output:61549d4c]
-%   data: {"dataType":"text","outputData":{"text":"Processing file 1 of 3: .\\G2018\\10\\14\\ATL03_20181014001049_02350102_006_02_subsetted.h5\nProcessing file 2 of 3: .\\G2018\\10\\14\\ATL03_20181014013805_02360101_006_02_subsetted.h5\nProcessing file 3 of 3: .\\G2018\\10\\14\\ATL03_20181014054647_02380110_006_02_subsetted.h5\n","truncated":false}}
+%[output:813c60bd]
+%   data: {"dataType":"text","outputData":{"text":"Processing file 1 of 4: .\\G2018\\10\\14\\ATL03_20181014001049_02350102_006_02_subsetted.h5\nProcessing file 2 of 4: .\\G2018\\10\\14\\ATL03_20181014004349_02350107_006_02_subsetted.h5\nProcessing file 3 of 4: .\\G2018\\10\\14\\ATL03_20181014013805_02360101_006_02_subsetted.h5\nProcessing file 4 of 4: .\\G2018\\10\\14\\ATL03_20181014054647_02380110_006_02_subsetted.h5\n","truncated":false}}
 %---

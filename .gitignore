@@ -11,6 +11,7 @@ Examples/project_TW/*
 *.nc
 *.h5
 *.zip
+*.txt
 
 # shapefile
 *.shp
