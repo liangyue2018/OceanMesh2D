@@ -8,6 +8,7 @@ filepath = "./G" + datestr(1:4) + '/' ...
 fList = dir(filepath + '*.h5');
 filename = {fList.name}';
 fnm = fullfile(filepath, filename);
+assert(~isempty(fnm), 'ERROR: No h5 files in %s', filepath);
 
 % read h5file
 gtx = {'gt1r' 'gt2r' 'gt3r'};

@@ -2,6 +2,14 @@
 # Download ICESat-2 ATL03 data using Harmony API, required: 
 # NASA Earthdata Login (~/_netrc)
 # curl
+user=$(basename "$HOME")
+if [[ "$user" = "caolang" ]]; then
+	abspath="."
+elif [[ "$user" = "ac6vfo7a3a" ]]; then
+	abspath="/work/share/ac6vfo7a3a/caolang/data/ICESat-2"
+else
+	abspath="."
+fi
 
 # Step 1: Parse start/end date (yyyyMMdd) and shape file
 if [ "$#" -eq 3 ]; then
@@ -18,12 +26,12 @@ if [ "$#" -eq 3 ]; then
 	# set variables
 	time_range="\"$start_iso\":\"$end_iso\""
 	shapefile="$shape"
-	save_dir="./G${start_date:0:4}/${start_date:4:2}/${start_date:6:2}"
+	save_dir="$abspath/G${start_date:0:4}/${start_date:4:2}/${start_date:6:2}"
 else
 	# default variables
 	time_range="\"2018-10-14T00:00:00.000Z\":\"2018-10-15T00:00:00.000Z\""
 	shapefile="./coast_polygon_c_1.zip"
-	save_dir="./G2018/10/14"
+	save_dir="$abspath/G2018/10/14"
 fi
 version="006"
 
