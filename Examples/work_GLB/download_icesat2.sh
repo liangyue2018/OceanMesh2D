@@ -2,57 +2,54 @@
 # Download ICESat-2 ATL03 data using Harmony API, required: 
 # NASA Earthdata Login (~/_netrc)
 # curl
+#
+# Step 1: Parse start/end date (yyyyMMdd) and shape file
+start_date="$1"
+end_date="$2"
+shapefile="$3"
+if ! [[ "$start_date" =~ ^[0-9]{8}$ ]] || ! [[ "$end_date" =~ ^[0-9]{8}$ ]]; then
+	echo "Date format: [start_date(yyyyMMdd)] [end_date(yyyyMMdd)]" >&2
+	exit 1
+fi
+if ! [[ -f "$shapefile" ]]; then
+	echo "Shapefile not found: $shapefile" >&2
+	exit 1
+fi
+start_iso="${start_date:0:4}-${start_date:4:2}-${start_date:6:2}T00:00:00.000Z"
+end_iso="${end_date:0:4}-${end_date:4:2}-${end_date:6:2}T00:00:00.000Z"
 
+# set variables
+time_range="\"$start_iso\":\"$end_iso\""
+save_dir="./data/G${start_date:0:4}/${start_date:4:2}/${start_date:6:2}"
+version="006"
+
+echo "####Options:"
+echo "    time_range=$time_range"
+echo "    shapefile=$shapefile"
+echo "    save_dir=$save_dir"
+
+# Step 2: Build the URL for request
+if [ "$version" = "006" ]; then
+	cmr_id="C2596864127-NSIDC_CPRD"
+elif [ "$version" = "007" ]; then
+	cmr_id="C3326974349-NSIDC_CPRD"
+else
+	echo "Unsupported version: $version" >&2
+	exit 1
+fi
+variable="all"
+url="https://harmony.earthdata.nasa.gov/$cmr_id/\
+ogc-api-coverages/1.0.0/collections/$variable/coverage/\
+rangeset?forceAsync=true&subset=time($time_range)&maxResults=1" #&maxResults=1
 
 if [ "$#" -eq 3 ]; then
-	# Step 1: Parse start/end date (yyyyMMdd) and shape file
-	start_date="$1"
-	end_date="$2"
-	shape="$3"
-	if ! [[ "$start_date" =~ ^[0-9]{8}$ ]] || ! [[ "$end_date" =~ ^[0-9]{8}$ ]]; then
-		echo "Date format: [start_date(yyyyMMdd)] [end_date(yyyyMMdd)]" >&2
-		exit 1
-	fi
-	if ! [[ -f "$shape" ]]; then
-		echo "Shapefile not found: $shape" >&2
-		exit 1
-	fi
-	start_iso="${start_date:0:4}-${start_date:4:2}-${start_date:6:2}T00:00:00.000Z"
-	end_iso="${end_date:0:4}-${end_date:4:2}-${end_date:6:2}T00:00:00.000Z"
-
-	# set variables
-	time_range="\"$start_iso\":\"$end_iso\""
-	shapefile="$shape"
-	save_dir="./data/G${start_date:0:4}/${start_date:4:2}/${start_date:6:2}"
-
-	version="006"
-
-	echo "####Options:"
-	echo "    time_range=$time_range"
-	echo "    shapefile=$shapefile"
-	echo "    save_dir=$save_dir"
-
-	# Step 2: Build the URL for request
-	if [ "$version" = "006" ]; then
-		cmr_id="C2596864127-NSIDC_CPRD"
-	elif [ "$version" = "007" ]; then
-		cmr_id="C3326974349-NSIDC_CPRD"
-	else
-		echo "Unsupported version: $version" >&2
-		exit 1
-	fi
-	variable="all"
-	url="https://harmony.earthdata.nasa.gov/$cmr_id/\
-	ogc-api-coverages/1.0.0/collections/$variable/coverage/\
-	rangeset?forceAsync=true&subset=time($time_range)&maxResults=1" #&maxResults=1
-
 	# Step 3: Submit the request and get the JSON response
 	response=$(curl -Lnbj -sS "$url" -F "shapefile=@$shapefile;type=application/shapefile+zip")
 	sleep 5
 	jobID=$(echo "$response" | jq -r '.jobID // empty')
-elif [ "$#" -eq 1 ]; then
+elif [ "$#" -eq 4 ]; then
 	# Get jobID from command line argument
-	jobID="$1"
+	jobID="$4"
 	response=$(curl -Lnbj -sS "https://harmony.earthdata.nasa.gov/jobs/$jobID")
 else
 	echo "Usage: $0 <start_date> <end_date> <shapefile>" >&2

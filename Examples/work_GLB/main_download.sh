@@ -34,7 +34,7 @@ for year in 2018; do
 			for index in {1..3}; do
 				shape_file="coast_polygon_c_${index}.zip"
 				#bash download_icesat2.sh "$start_date" "$end_date" "$shape_file"
-				bash download_icesat2.sh "${jobID[$index]}"
+				bash download_icesat2.sh "$start_date" "$end_date" "$shape_file" "${jobID[$index]}"
 				rc=$?
 				if [ $rc -ne 0 ]; then
 					exit $rc
