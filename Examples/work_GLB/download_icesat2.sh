@@ -40,18 +40,18 @@ fi
 variable="all"
 url="https://harmony.earthdata.nasa.gov/$cmr_id/\
 ogc-api-coverages/1.0.0/collections/$variable/coverage/\
-rangeset?forceAsync=true&subset=time($time_range)" #&maxResults=1
+rangeset?forceAsync=true&subset=time($time_range)&skipPreview=true" #&maxResults=1
 
 if [ "$#" -eq 3 ]; then
 	# Step 3: Submit the request and get the JSON response
 	response=$(curl -Lnbj -sS "$url" -F "shapefile=@$shapefile;type=application/shapefile+zip")
-	sleep 5
+	sleep 3
 	jobID=$(echo "$response" | jq -r '.jobID // empty')
 elif [ "$#" -eq 4 ]; then
 	# Get jobID from command line argument
 	jobID="$4"
 	response=$(curl -Lnbj -sS "https://harmony.earthdata.nasa.gov/jobs/$jobID")
-	sleep 5
+	sleep 3
 else
 	echo "Usage: $0 <start_date> <end_date> <shapefile>" >&2
 	exit 1
@@ -63,7 +63,7 @@ if [ -z "$jobID" ]; then
 	exit 1
 fi
 echo "Job submitted successfully, jobID=$jobID"
-echo "$response" | jq
+#echo "$response" | jq
 
 # construct job status URL
 numGrans=$(echo "$response" | jq -r '.numInputGranules')
