@@ -432,7 +432,7 @@ classdef edgefx
             period  = 12.42*3600; % M2 period in seconds
             
             for param = obj.wl'
-                if numel(param)==1
+                if isscalar(param)
                     % no bounds specified.
                     wlp = param(1);
                     z_min = -inf;
@@ -495,7 +495,7 @@ classdef edgefx
             else
                 filtit = 0;
                 for lambda = obj.fl'
-                    if length(lambda) == 1 || lambda(2) == 0
+                    if isscalar(lambda) || lambda(2) == 0
                         % do a low pass filter
                         tmpz_ft  = filt2(tmpz,dy,lambda(1),'lp') ;
                     elseif all(lambda ~= 0)
@@ -630,7 +630,7 @@ classdef edgefx
             % Allow user to specify depth ranges for slope parameter.
             obj.slpd = NaN([obj.nx,obj.ny]);
             for param = obj.slp'
-                if numel(param)==1
+                if isscalar(param)
                     % no bounds specified. valid in this range.
                     slpp = param(1);
                     z_min = -inf;
@@ -754,8 +754,8 @@ classdef edgefx
                 stride = stride*2;
             end
             stride = ceil(stride/obj.gridspace);
-            I = [1:stride:size(xgrid,1)];
-            J = [1:stride:size(xgrid,2)];
+            I = 1:stride:size(xgrid,1);
+            J = 1:stride:size(xgrid,2);
             
             figure;
             m_proj('merc',...
@@ -867,7 +867,7 @@ classdef edgefx
             end
             
             for param = obj.max_el'
-                if numel(param)==1 && param~=0
+                if isscalar(param) && param~=0
                     mx   = obj.max_el(1);
                     limidx = hh_m > mx | isnan(hh_m);
                     
@@ -912,7 +912,7 @@ classdef edgefx
             % make g a function of space
             dmy     = xg*0 ;
             for param = obj.g'
-                if numel(param)==1 && param~=0
+                if isscalar(param) && param~=0
                     lim   = obj.g(1);
                     dmy  = dmy + lim ;
                 else

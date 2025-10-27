@@ -2,22 +2,19 @@
 # Download ICESat-2 ATL03 data using Harmony API, required: 
 # NASA Earthdata Login (~/_netrc)
 # curl
-user=$(basename "$HOME")
-if [[ "$user" = "caolang" ]]; then
-	abspath="."
-elif [[ "$user" = "ac6vfo7a3a" ]]; then
-	abspath="/work/share/ac6vfo7a3a/caolang/data/ICESat-2"
-else
-	abspath="."
-fi
 
-# Step 1: Parse start/end date (yyyyMMdd) and shape file
+
 if [ "$#" -eq 3 ]; then
+	# Step 1: Parse start/end date (yyyyMMdd) and shape file
 	start_date="$1"
 	end_date="$2"
 	shape="$3"
-	if [[ ! "$start_date" =~ ^[0-9]{8}$ ]] || [[ ! "$end_date" =~ ^[0-9]{8}$ ]]; then
-		echo "Usage: $0 [start_date(yyyyMMdd)] [end_date(yyyyMMdd)] [shapefile]" >&2
+	if ! [[ "$start_date" =~ ^[0-9]{8}$ ]] || ! [[ "$end_date" =~ ^[0-9]{8}$ ]]; then
+		echo "Date format: [start_date(yyyyMMdd)] [end_date(yyyyMMdd)]" >&2
+		exit 1
+	fi
+	if ! [[ -f "$shape" ]]; then
+		echo "Shapefile not found: $shape" >&2
 		exit 1
 	fi
 	start_iso="${start_date:0:4}-${start_date:4:2}-${start_date:6:2}T00:00:00.000Z"
@@ -26,38 +23,42 @@ if [ "$#" -eq 3 ]; then
 	# set variables
 	time_range="\"$start_iso\":\"$end_iso\""
 	shapefile="$shape"
-	save_dir="$abspath/G${start_date:0:4}/${start_date:4:2}/${start_date:6:2}"
-else
-	# default variables
-	time_range="\"2018-10-14T00:00:00.000Z\":\"2018-10-15T00:00:00.000Z\""
-	shapefile="./coast_polygon_c_1.zip"
-	save_dir="$abspath/G2018/10/14"
-fi
-version="006"
+	save_dir="./data/G${start_date:0:4}/${start_date:4:2}/${start_date:6:2}"
 
-echo "Downloading ICESat-2 ATL03 data using:"
-echo "    time_range=$time_range"
-echo "    shapefile=$shapefile"
-echo "    save_dir=$save_dir"
+	version="006"
 
-# Step 2: Build the URL for request
-if [ "$version" == "006" ]; then
-	cmr_id="C2596864127-NSIDC_CPRD"
-elif [ "$version" == "007" ]; then
-	cmr_id="C3326974349-NSIDC_CPRD"
+	echo "####Options:"
+	echo "    time_range=$time_range"
+	echo "    shapefile=$shapefile"
+	echo "    save_dir=$save_dir"
+
+	# Step 2: Build the URL for request
+	if [ "$version" = "006" ]; then
+		cmr_id="C2596864127-NSIDC_CPRD"
+	elif [ "$version" = "007" ]; then
+		cmr_id="C3326974349-NSIDC_CPRD"
+	else
+		echo "Unsupported version: $version" >&2
+		exit 1
+	fi
+	variable="all"
+	url="https://harmony.earthdata.nasa.gov/$cmr_id/\
+	ogc-api-coverages/1.0.0/collections/$variable/coverage/\
+	rangeset?forceAsync=true&subset=time($time_range)&maxResults=1" #&maxResults=1
+
+	# Step 3: Submit the request and get the JSON response
+	response=$(curl -Lnbj -sS "$url" -F "shapefile=@$shapefile;type=application/shapefile+zip")
+	sleep 5
+	jobID=$(echo "$response" | jq -r '.jobID // empty')
+elif [ "$#" -eq 1 ]; then
+	# Get jobID from command line argument
+	jobID="$1"
+	response=$(curl -Lnbj -sS "https://harmony.earthdata.nasa.gov/jobs/$jobID")
 else
-	echo "Unsupported version: $version"
+	echo "Usage: $0 <start_date> <end_date> <shapefile>" >&2
 	exit 1
 fi
-variable="all"
-url="https://harmony.earthdata.nasa.gov/$cmr_id/\
-ogc-api-coverages/1.0.0/collections/$variable/coverage/\
-rangeset?forceAsync=true&subset=time($time_range)&maxResults=1" #&maxResults=1
 
-# Step 3: Submit the request and get the JSON response
-response=$(curl -Lnbj -sS "$url" -F "shapefile=@$shapefile;type=application/shapefile+zip")
-#response=$(curl -Lnbj -sS https://harmony.earthdata.nasa.gov/jobs/04078a79-dc2b-4186-9608-34b5f488d91e)
-jobID=$(echo "$response" | jq -r '.jobID // empty')
 if [ -z "$jobID" ]; then
 	echo "ERROR: Job submission failed" >&2
 	echo "$response" | jq
@@ -101,6 +102,27 @@ if [ "${#hrefs[@]}" -ne "$numGrans" ]; then
 	exit 1
 fi
 
+# filter granules with segment number determined by shape file
+case "$(basename "$shapefile")" in
+	*_1.zip) segnum=("02" "03" "05" "06") ;;
+	*_2.zip) segnum=("14" "01" "07" "08") ;;
+	*_3.zip) segnum=("09" "10" "12" "13") ;;
+	*) echo "Unknown shapefile: $shapefile" >&2; exit 1 ;;
+esac
+
+filtered_hrefs=()
+for href in "${hrefs[@]}"; do
+	fnm=$(basename "$href")
+	ss=$(awk -F'_' '{print substr($3,7,2)}' <<< "$fnm")
+	for sn in "${segnum[@]}"; do
+		if [ "$ss" = "$sn" ]; then
+			filtered_hrefs+=("$href")
+			break
+		fi
+	done
+done
+hrefs=("${filtered_hrefs[@]}")
+
 # Step 4: Download the results
 mkdir -p "$save_dir"
 url_list="$save_dir/download_urls.txt"
@@ -112,6 +134,9 @@ h5_list=()
 for href in "${hrefs[@]}"; do
 	h5file="$save_dir/$(basename "$href")"
 	h5_list+=("$h5file")
+	if [ -s "$h5file" ]; then
+		continue
+	fi
 	metrics=$(curl -Lnbj -sS --fail --retry 3 --retry-delay 5 --write-out "$format" "$href" -o "$h5file")
 	read -r http_code time_total size_download <<< "$metrics"
 	if [ "$http_code" -ne 200 ]; then
@@ -132,6 +157,6 @@ for fnm in "${h5_list[@]}"; do
 done
 
 if [ ${#missing[@]} -ne 0 ]; then
-	echo "ERROR: Expected $numGrans files, but missing ${#missing[@]}:" >&2
+	echo "ERROR: Expected ${#hrefs[@]} files, but missing ${#missing[@]}:" >&2
 	printf '    %s\n' "${missing[@]}" >&2
 fi
