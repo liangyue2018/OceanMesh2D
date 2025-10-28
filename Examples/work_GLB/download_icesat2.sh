@@ -8,11 +8,11 @@ start_date="$1"
 end_date="$2"
 shapefile="$3"
 if ! [[ "$start_date" =~ ^[0-9]{8}$ ]] || ! [[ "$end_date" =~ ^[0-9]{8}$ ]]; then
-	echo "Date format: [start_date(yyyyMMdd)] [end_date(yyyyMMdd)]" >&2
+	echo "ERROR: Date format: [start_date(yyyyMMdd)] [end_date(yyyyMMdd)]" >&2
 	exit 1
 fi
 if ! [[ -f "$shapefile" ]]; then
-	echo "Shapefile not found: $shapefile" >&2
+	echo "ERROR: Shapefile not found: $shapefile" >&2
 	exit 1
 fi
 start_iso="${start_date:0:4}-${start_date:4:2}-${start_date:6:2}T00:00:00.000Z"
@@ -34,7 +34,7 @@ if [ "$version" = "006" ]; then
 elif [ "$version" = "007" ]; then
 	cmr_id="C3326974349-NSIDC_CPRD"
 else
-	echo "Unsupported version: $version" >&2
+	echo "ERROR: Unsupported version: $version" >&2
 	exit 1
 fi
 variable="all"
@@ -53,7 +53,7 @@ elif [ "$#" -eq 4 ]; then
 	response=$(curl -Lnbj -sS "https://harmony.earthdata.nasa.gov/jobs/$jobID")
 	sleep 3
 else
-	echo "Usage: $0 <start_date> <end_date> <shapefile>" >&2
+	echo "ERROR: Usage: $0 <start_date> <end_date> <shapefile>" >&2
 	exit 1
 fi
 
@@ -72,22 +72,22 @@ job_url="https://harmony.earthdata.nasa.gov/jobs/$jobID"
 # wait until status is successful
 while :; do
 	status_json=$(curl -Lnbj -sS "$job_url")
-	status=$(echo "$status_json" | jq -r '.status')
-	message=$(echo "$status_json" | jq -r '.message')
-	progress=$(echo "$status_json" | jq -r '.progress')
+	status=$(echo "$status_json" | jq -r '.status // empty')
+	message=$(echo "$status_json" | jq -r '.message // empty')
+	progress=$(echo "$status_json" | jq -r '.progress // empty')
 	if [ "$status" = "successful" ]; then
-		original_size=$(echo "$status_json" | jq -r '.originalDataSize')
-		output_size=$(echo "$status_json" | jq -r '.outputDataSize')
-		pct_reduction=$(echo "$status_json" | jq -r '.dataSizePercentChange')
+		original_size=$(echo "$status_json" | jq -r '.originalDataSize // empty')
+		output_size=$(echo "$status_json" | jq -r '.outputDataSize // empty')
+		pct_reduction=$(echo "$status_json" | jq -r '.dataSizePercentChange // empty')
 		echo "Job completed successfully, achieved a $pct_reduction ($original_size -> $output_size)"
 		break
 	fi
 	if [ "$status" = "failed" ]; then
-		echo "$message" >&2
+		echo "ERROR: $message" >&2
 		exit 1
 	fi
 	echo "Job status: $status with progress: $progress%"
-	sleep 60
+	sleep 180
 done
 
 # extract download links whose title or href matches ATL03_*.h5
@@ -105,7 +105,7 @@ case "$(basename "$shapefile")" in
 	*_1.zip) segnum=("02" "03" "05" "06") ;;
 	*_2.zip) segnum=("14" "01" "07" "08") ;;
 	*_3.zip) segnum=("09" "10" "12" "13") ;;
-	*) echo "Unknown shapefile: $shapefile" >&2; exit 1 ;;
+	*) echo "ERROR: Unknown shapefile: $shapefile" >&2; exit 1 ;;
 esac
 
 filtered_hrefs=()
@@ -135,11 +135,17 @@ for href in "${hrefs[@]}"; do
 	if [ -s "$h5file" ]; then
 		continue
 	fi
-	metrics=$(curl -Lnbj -sS --fail --retry 3 --retry-delay 5 --write-out "$format" "$href" -o "$h5file")
+	metrics=$(curl -Lnbj -sS --fail \
+		--connect-timeout 30 \
+		--retry 5 --retry-delay 10 --retry-max-time 600 \
+		--speed-limit 1024 --speed-time 30 \
+		 --write-out "$format" "$href" -o "$h5file")
+	curl_rc=$?
 	read -r http_code time_total size_download <<< "$metrics"
-	if [ "$http_code" -ne 200 ]; then
-		echo "    Failed to download: $h5file" >&2
+	if [ $curl_rc -ne 0 ] || [ "$http_code" -ne 200 ]; then
+		echo "ERROR: Failed to download: $h5file" >&2
 		rm -f "$h5file"
+		continue
 	fi
 	time_min=$(awk -v t="$time_total" 'BEGIN{printf "%.1f", t/60}')
 	size_mib=$(awk -v b="$size_download" 'BEGIN{printf "%.1f", b/1024/1024}')
@@ -155,6 +161,7 @@ for fnm in "${h5_list[@]}"; do
 done
 
 if [ ${#missing[@]} -ne 0 ]; then
-	echo "ERROR: Expected ${#hrefs[@]} files, but missing ${#missing[@]}:" >&2
+	echo "ERROR: Expected ${#hrefs[@]} files, but missing ${#missing[@]}\ 
+	 with shapefile: ${shapefile} and jobID: ${jobID}" >&2
 	printf '    %s\n' "${missing[@]}" >&2
 fi

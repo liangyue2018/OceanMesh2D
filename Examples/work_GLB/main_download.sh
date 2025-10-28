@@ -19,9 +19,7 @@ for year in 2018; do
 			# fi
 
 			# specify jobID manually (optional)
-			# jobID=("8d5b27bf-7e6d-4313-947f-40e5d32a7ae4" 
-			#        "3a6bb08d-4aeb-4aaa-bb3d-184ceb3b89ff" 
-			# 	   "b68d23ad-f767-4199-bc0e-26c50edbfb32")
+			# jobID=("" "1638269b-bc78-4476-afb4-9b4de702f0e2" "")
 
 			# set start and end date
 			start_date="${year}${month}${day}"
