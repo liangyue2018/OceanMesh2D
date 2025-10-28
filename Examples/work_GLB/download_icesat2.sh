@@ -165,5 +165,5 @@ if [ ${#missing[@]} -ne 0 ]; then
 	echo "    Run the command again to download missing files:" >&2
 	echo "        bash $0 $start_date $end_date $shapefile $jobID" >&2
 	echo "    Or use the following links to download manually:" >&2
-	printf '    %s\n' "${missing[@]}" >&2
+	printf '        %s\n' "${missing[@]}" >&2
 fi
