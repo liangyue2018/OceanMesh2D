@@ -71,7 +71,14 @@ job_url="https://harmony.earthdata.nasa.gov/jobs/$jobID"
 
 # wait until status is successful
 while :; do
-	status_json=$(curl -Lnbj -sS "$job_url")
+	tmp=$(mktemp)
+	http_code=$(curl -Lnbj -sS -w "%{http_code}" -o "$tmp" "$job_url")
+	curl_rc=$?
+	if [ "$http_code" -ne 200 ] || [ $curl_rc -ne 0 ]; then
+		sleep 60
+		continue
+	fi
+	status_json=$(cat "$tmp"); rm -f "$tmp"
 	status=$(echo "$status_json" | jq -r '.status // empty')
 	message=$(echo "$status_json" | jq -r '.message // empty')
 	progress=$(echo "$status_json" | jq -r '.progress // empty')
@@ -87,7 +94,7 @@ while :; do
 		exit 1
 	fi
 	echo "Job status: $status with progress: $progress%"
-	sleep 180
+	sleep 60
 done
 
 # extract download links whose title or href matches ATL03_*.h5
@@ -139,7 +146,8 @@ for href in "${hrefs[@]}"; do
 		--connect-timeout 30 \
 		--retry 5 --retry-delay 10 --retry-max-time 600 \
 		--speed-limit 1024 --speed-time 30 \
-		 --write-out "$format" "$href" -o "$h5file")
+		--write-out "$format" \
+		"$href" -o "$h5file")
 	curl_rc=$?
 	read -r http_code time_total size_download <<< "$metrics"
 	if [ $curl_rc -ne 0 ] || [ "$http_code" -ne 200 ]; then
@@ -152,18 +160,26 @@ for href in "${hrefs[@]}"; do
 	printf "Downloaded %s (%.1f MiB) in %.1f minutes\n" "$h5file" "$size_mib" "$time_min"
 done
 
-# Step 5: Check the missing files
-missing=()
+# Step 5: Check the validity of downloaded files
+if ! command -v h5ls >/dev/null 2>&1; then
+	if [ "$(basename "$HOME")" = "caolang" ]; then
+		eval "$(conda shell.bash hook)" && conda activate icepyx_env
+	elif [ "$(basename "$HOME")" = "ac6vfo7a3a" ]; then
+		module load mathlib/hdf5/1.12.2-intel-21
+	fi
+fi
+invalid=()
 for fnm in "${h5_list[@]}"; do
-	if ! [ -f "$fnm" ]; then
-		missing+=("$fnm")
+	if ! h5ls "$fnm" >/dev/null 2>&1; then
+		invalid+=("$fnm")
+		rm -f "$fnm"
 	fi
 done
 
-if [ ${#missing[@]} -ne 0 ]; then
-	echo "ERROR: Expected ${#hrefs[@]} files, but missing ${#missing[@]} files" >&2
-	echo "    Run the command again to download missing files:" >&2
+if [ ${#invalid[@]} -ne 0 ]; then
+	echo "ERROR: Expected ${#hrefs[@]} files, but has ${#invalid[@]} invalid files" >&2
+	echo "    Run the script again:" >&2
 	echo "        bash $0 $start_date $end_date $shapefile $jobID" >&2
 	echo "    Or use the following links to download manually:" >&2
-	printf '        %s\n' "${missing[@]}" >&2
+	printf '        %s\n' "${invalid[@]}" >&2
 fi
