@@ -7,7 +7,7 @@ for year in 2018; do
    	# for month in {01..12}; do
    	for month in 10; do
 		# for day in {01..31}; do
-		for day in {15..20}; do
+		for day in {21..31}; do
 			# check if the date is valid
 			if ! date -d "${year}-${month}-${day}" >/dev/null 2>&1; then
 				continue
@@ -17,9 +17,6 @@ for year in 2018; do
 			# if [ "$year" -ne 2018 ] || [ "$month" -ne 10 ] || [ "$day" -ne 14 ]; then
 			# 	continue
 			# fi
-
-			# specify jobID manually (optional)
-			# jobID=("" "1638269b-bc78-4476-afb4-9b4de702f0e2" "")
 
 			# set start and end date
 			start_date="${year}${month}${day}"
@@ -32,7 +29,6 @@ for year in 2018; do
 			for index in {1..3}; do
 				shape_file="coast_polygon_c_${index}.zip"
 				bash download_icesat2.sh "$start_date" "$end_date" "$shape_file"
-				#bash download_icesat2.sh "$start_date" "$end_date" "$shape_file" "${jobID[$((index-1))]}"
 				rc=$?
 				if [ $rc -ne 0 ]; then
 					exit $rc

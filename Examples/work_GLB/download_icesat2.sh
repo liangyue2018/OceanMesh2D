@@ -161,7 +161,9 @@ for fnm in "${h5_list[@]}"; do
 done
 
 if [ ${#missing[@]} -ne 0 ]; then
-	echo "ERROR: Expected ${#hrefs[@]} files, but missing ${#missing[@]}\ 
-	 with shapefile: ${shapefile} and jobID: ${jobID}" >&2
+	echo "ERROR: Expected ${#hrefs[@]} files, but missing ${#missing[@]} files" >&2
+	echo "    Run the command again to download missing files:" >&2
+	echo "        bash $0 $start_date $end_date $shapefile $jobID" >&2
+	echo "    Or use the following links to download manually:" >&2
 	printf '    %s\n' "${missing[@]}" >&2
 fi
