@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Download ICESat-2 ATL03 data using Harmony API, required: 
 # NASA Earthdata Login (~/_netrc)
 # curl
