@@ -5,18 +5,25 @@ function shapeoutC = make_coast_polygon(reso, bbox, bufwidth, tol, varargin)
 %   bbox: [lonmin lonmax; latmin latmax]
 %   bufwidth: buffer width for {outer inner} in degrees
 %   tol: tolerance in degrees
+%
 % Optional inputs:
 %  'min_area': minimum area (km^2) to keep land polygons (default: 100)
 %  'latq', 'lonq': query points to remove land polygons (default: [])
 %  'clip_lat': latitudes to clip geopolyshape into several parts (default: [])
 %  'save_flag': whether to save output files (default: false)
+%
 % Output:
 %   shape: coastline
 %   latb, lonb: vector data of coastal buffer polygons
 %   shapeout: coastal buffer polygons (geopolyshape)
 %   shapeoutC: cell array of geopolyshapes if clipped by latitudes
+%
+% check and parse inputs
+assert(ischar(reso) && ismember(reso, {'c','l','i','h','f'}), 'Error: Invalid reso.');
+assert(isnumeric(bbox) && size(bbox,1) == 2 && size(bbox,2) == 2, 'Error: Invalid bbox.');
+assert(iscell(bufwidth) && numel(bufwidth) == 2, 'Error: bufwidth should be a cell array with 2 elements.');
+assert(isnumeric(tol) && tol > 0, 'Error: Invalid tol.');
 
-% parse and check inputs
 p = inputParser;
 addParameter(p, 'min_area', 100);
 addParameter(p, 'latq', []);
@@ -25,10 +32,6 @@ addParameter(p, 'clip_lat', []);
 addParameter(p, 'save_flag', false);
 parse(p, varargin{:});
 inp = p.Results;
-assert(ischar(reso) && ismember(reso, {'c','l','i','h','f'}), 'Error: Invalid reso.');
-assert(isnumeric(bbox) && size(bbox,1) == 2 && size(bbox,2) == 2, 'Error: Invalid bbox.');
-assert(iscell(bufwidth) && numel(bufwidth) == 2, 'Error: bufwidth should be a cell array with 2 elements.');
-assert(isnumeric(tol) && tol > 0, 'Error: Invalid tol.');
 
 % load shapefile
 fnm = "D:\soft\OceanMesh2D\datasets\GSHHS_shp\" + reso + '\GSHHS_' + reso + '_L1.shp';

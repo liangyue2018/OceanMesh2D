@@ -7,7 +7,7 @@ for year in 2018; do
    	# for month in {01..12}; do
    	for month in 10; do
 		# for day in {01..31}; do
-		for day in {21..31}; do
+		for day in {23..31}; do
 			# check if the date is valid
 			if ! date -d "${year}-${month}-${day}" >/dev/null 2>&1; then
 				continue

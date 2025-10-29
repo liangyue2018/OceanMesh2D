@@ -1,24 +1,36 @@
-function S = analyze_icesat2_ocean(datestr, save_flag)
+function S = analyze_icesat2_ocean(datestr, varargin)
 % Read ICESat-2 ATL03 geolocated photon data, calculate ocean surface
 % wave parameters using strong beam profiles and write output.
 % Usage:
 %   S = analyze_icesat2_ocean('20181014', 1);
 %   S = analyze_icesat2_ocean('201810**', 1);
+%
 % Inputs:
 %   datestr - 'yyyyMMdd' or 'yyyyMM**'
-%   save_flag - 0 or 1
+%
+% Optional inputs:
+%   'oceanSegLen' - ocean segment length to analyze (default: 10.24 km)
+%   'depth' - depth limit to filter geosegs (default: -10 m)
+%   'distance' - distance from the coastline (km) used to filter geosegs (default: [])
+%   'save_flag' - 0 or 1 (default: 1)
+%
 % Outputs:
 %   S - nx1 struct, n is the number of granules
 %   S.bnd_poly - geopolyshape of granule bounding polygon
 %   S.shape - geopointshape of ref_ph_lat/ref_ph_lon
 %   To be added...
 %
-% check input arguments
-if nargin < 2
-    save_flag = 0;
-end
+% check and parse inputs
 assert(ischar(datestr) && length(datestr) == 8, 'ERROR: Invalid date string.');
-assert(ismember(save_flag, [0 1]), 'ERROR: The save_flag must be 0 or 1.');
+
+p = inputParser;
+addParameter(p, 'oceanSegLen', 10.24, @(x) x > 0);
+addParameter(p, 'depth', -10, @(x) x <= 0);
+addParameter(p, 'distance', []);
+addParameter(p, 'save_flag', 1, @(x) ismember(x, [0 1]));
+
+parse(p, varargin{:});
+inp = p.Results;
 
 % define filepath
 if all(isstrprop(datestr, 'digit')) % yyyyMMdd
@@ -39,16 +51,19 @@ assert(~isempty(h5file), 'ERROR: No h5 files in %s', filepath);
 % read h5file
 S = struct();
 tic;
+fprintf('+-----------------------------------------------------------------------------+\n');
+fprintf('Start processing %d granules for %s...\n', length(h5file), datestr);
 for n = 1:length(h5file)
-    fprintf('Progress %d of %d: %s\n', n, length(h5file), h5file{n}(end-60:end));
+    fprintf('Granule %d of %d: %s\n', n, length(h5file), h5file{n}(end-60:end));
 
     % Get orbit information
     orb = read_granule_info(h5file{n});
     if isempty(orb.beam_list)
+        fprintf('>>>>Skip granule %d due to empty beam list.\n', n);
         continue
     end
     if orb.qa_flag == 1
-        fprintf('    Skip due to quality assessment failure.\n');
+        fprintf('>>>>Skip granule %d due to quality assessment failure.\n', n);
         continue
     end
     S(n).orbit_info = orb;
@@ -58,6 +73,11 @@ for n = 1:length(h5file)
     ref_ph_lon = cell(numel(orb.beam_list),1);
     for i = 1:numel(orb.beam_list)
         beam = orb.beam_list{i};
+        GT = read_gtx_geodata(h5file{n}, beam);
+        if isempty(GT)
+            continue
+        end
+
         ref_ph_idx = h5read(h5file{n}, "/" + beam + '/geolocation/reference_photon_index'); % _FillValue=0
 
 
@@ -70,16 +90,14 @@ for n = 1:length(h5file)
 end
 elapsedTime = toc;
 fprintf('Finished processing %d granules in %s.\n', length(h5file), formatElapsedTime(elapsedTime));
-
-if save_flag
+if inp.save_flag
     fprintf('Saving output to %s\n', output);
     save(output, 'S');
 end
+fprintf('+-----------------------------------------------------------------------------+\n');
 
 if nargout == 0
     clear S;
-end
-
 end
 
 function orb = read_granule_info(h5file)
@@ -105,17 +123,20 @@ for gtx = orb.beam_list
         info = h5info(h5file, "/" + gtx{1} + '/heights/h_ph');
         assert(~isempty(info));
 
-        % check if ocean profile length is valid (10.24 km)
+        % check if ocean segment length is desired
         segment_length = h5read(h5file, "/" + gtx{1} + '/geolocation/segment_length'); % [meters] DOUBLE
         segment_ph_cnt = h5read(h5file, "/" + gtx{1} + '/geolocation/segment_ph_cnt'); % _FillValue=0
         surf_type = h5read(h5file, "/" + gtx + '/geolocation/surf_type', [2 1], [1 Inf]); % 5xN [0 1] [not-type is-type]
         sloc = segment_ph_cnt > 0 & surf_type == 1;
-        profile_length = sum(segment_length(sloc)) / 1000; % [km]
-        assert(profile_length >= 10.24);
+        totalSegLen = sum(segment_length(sloc)) / 1000; % [km]
+        assert(totalSegLen >= inp.oceanSegLen);
 
     catch
         orb.beam_list = setdiff(orb.beam_list, gtx);
     end
+end
+if isempty(orb.beam_list)
+    return
 end
 
 % get ascending/descending flag
@@ -197,23 +218,38 @@ sloc = GT.segment_ph_cnt > 0 & ...
        (GT.podppd_flag == 0 | GT.podppd_flag == 4) & ...
        (GT.surf_type == 1);
 GT = GT(sloc, :);
-if isempty(GT)
+totalSegLen = sum(GT.segment_length) / 1000; % [km]
+if totalSegLen < inp.oceanSegLen
+    GT = [];
     return
 end
 assert(nnz(GT.ph_index_beg == 0) == 0 && nnz(GT.ref_ph_idx == 0) == 0, 'Error: Found fill values (0)');
 
 % Fine selection based on water depth and distance from the coastline
-GT.depth_ocn_seg = get_lonlat_depth(GT.ref_ph_lon, GT.ref_ph_lat, 'h1'); % [meters] SRTM15_V2.7 15 arc-second
-%GT.dist_coast_seg = ;
-sloc = GT.depth_ocn_seg <= -10; % ocean depth <-10 m
+GT.depth_ocn_seg = get_lonlat_elevation(GT.ref_ph_lon, GT.ref_ph_lat, 'GEBCO_2025'); % 15 arc-second
+sloc = GT.depth_ocn_seg <= inp.depth;
+if ~isempty(inp.distance)
+    GT.dist_coast_seg = get_lonlat_dist2coast(GT.ref_ph_lon, GT.ref_ph_lat);
+    sloc = sloc & GT.dist_coast_seg >= inp.distance;
+end
 GT = GT(sloc, :);
-if isempty(GT)
+totalSegLen = sum(GT.segment_length) / 1000; % [km]
+if totalSegLen < inp.oceanSegLen
+    GT = [];
     return
 end
-assert(nnz(ismissing(GT, 3.4028235e+38)) == 0, 'Error: Found fill values (3.4028235e+38)');
+fillval = 3.4028235e+38;
+chkVars = {'dac', 'tide_equilibrium', 'tide_ocean', 'geoid', 'geoid_free2mean'};
+TF = ismissing(GT{:,chkVars}, fillval);
+if any(TF, 'all')
+    error('Error: Found fill values (%e) in variable(s): %s', fillval, strjoin(chkVars(any(TF, 1)), ', '));
+end
 
 % Get MSS for each ocean segment
+GT.mss = get_lonlat_elevation(GT.ref_ph_lon, GT.ref_ph_lat, 'DTU21'); % 1 arc-minute
+end
 
+%
 
 end
 

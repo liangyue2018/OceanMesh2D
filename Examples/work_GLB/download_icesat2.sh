@@ -177,9 +177,8 @@ for fnm in "${h5_list[@]}"; do
 done
 
 if [ ${#invalid[@]} -ne 0 ]; then
-	echo "ERROR: Expected ${#hrefs[@]} files, but has ${#invalid[@]} invalid files" >&2
-	echo "    Run the script again:" >&2
-	echo "        bash $0 $start_date $end_date $shapefile $jobID" >&2
-	echo "    Or use the following links to download manually:" >&2
-	printf '        %s\n' "${invalid[@]}" >&2
+	echo "ERROR: Expected ${#hrefs[@]} files, but has ${#invalid[@]} invalid file(s):" >&2
+	printf '    %s\n' "${invalid[@]}" >&2
+	echo "Run the script to download again:" >&2
+	echo "    bash $0 $start_date $end_date $shapefile $jobID" >&2
 fi
