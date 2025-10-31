@@ -52,7 +52,7 @@ assert(~isempty(h5file), 'ERROR: No h5 files in %s', filepath);
 S = struct();
 n = 1;
 for i = 1:length(h5file)
-    fprintf('Granule %d of %d: %s\n', i, length(h5file), h5file{i}(end-60:end));
+    fprintf('Granule %d of %d: %s. ', i, length(h5file), h5file{i}(end-60:end));
 
     % Get orbit information
     orb = read_granule_info(h5file{i});
@@ -79,6 +79,7 @@ for i = 1:length(h5file)
         fprintf('>>>>Skip granule %d due to [3] no enough ocean segments.\n', i);
         continue
     end
+    fprintf('Processed.\n');
     GT = vertcat(GT_list{:});
     S(n).orbit_info = orb;
     S(n).shape = geopointshape(GT.ref_ph_lat, GT.ref_ph_lon);
