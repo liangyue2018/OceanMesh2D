@@ -2,8 +2,8 @@ function S = analyze_icesat2_ocean(datestr, varargin)
 % Read ICESat-2 ATL03 geolocated photon data, calculate ocean surface
 % wave parameters using strong beam profiles and write output.
 % Usage:
-%   S = analyze_icesat2_ocean('20181014', 1);
-%   S = analyze_icesat2_ocean('201810**', 1);
+%   S = analyze_icesat2_ocean('20181014');
+%   S = analyze_icesat2_ocean('201810**');
 %
 % Inputs:
 %   datestr - 'yyyyMMdd' or 'yyyyMM**'
@@ -15,9 +15,9 @@ function S = analyze_icesat2_ocean(datestr, varargin)
 %   'save_flag' - 0 or 1 (default: 1)
 %
 % Outputs:
-%   S - nx1 struct, n is the number of granules
-%   S.bnd_poly - geopolyshape of granule bounding polygon
-%   S.shape - geopointshape of ref_ph_lat/ref_ph_lon
+%   S - nx1 struct
+%   S.orbit_info - orbit information structure
+%   S.shape - geopointshape of ref_ph_lat/ref_ph_lon from 3 strong beams
 %   To be added...
 %
 % check and parse inputs
@@ -50,59 +50,54 @@ assert(~isempty(h5file), 'ERROR: No h5 files in %s', filepath);
 
 % read h5file
 S = struct();
-tic;
-fprintf('+-----------------------------------------------------------------------------+\n');
-fprintf('Start processing %d granules for %s...\n', length(h5file), datestr);
-for n = 1:length(h5file)
-    fprintf('Granule %d of %d: %s\n', n, length(h5file), h5file{n}(end-60:end));
+n = 1;
+for i = 1:length(h5file)
+    fprintf('Granule %d of %d: %s\n', i, length(h5file), h5file{i}(end-60:end));
 
     % Get orbit information
-    orb = read_granule_info(h5file{n});
+    orb = read_granule_info(h5file{i});
     if isempty(orb.beam_list)
-        fprintf('>>>>Skip granule %d due to empty beam list.\n', n);
+        fprintf('>>>>Skip granule %d due to [1] sparse data.\n', i);
         continue
     end
     if orb.qa_flag == 1
-        fprintf('>>>>Skip granule %d due to quality assessment failure.\n', n);
+        fprintf('>>>>Skip granule %d due to [2] quality assessment failure.\n', i);
         continue
     end
-    S(n).orbit_info = orb;
 
     % Read strong beams
-    ref_ph_lat = cell(numel(orb.beam_list),1);
-    ref_ph_lon = cell(numel(orb.beam_list),1);
-    for i = 1:numel(orb.beam_list)
-        beam = orb.beam_list{i};
-        GT = read_gtx_geodata(h5file{n}, beam);
+    GT_list = {};
+    for j = 1:numel(orb.beam_list)
+        beam = orb.beam_list{j};
+        GT = read_gtx_geodata(h5file{i}, beam);
         if isempty(GT)
             continue
         end
-
-        ref_ph_idx = h5read(h5file{n}, "/" + beam + '/geolocation/reference_photon_index'); % _FillValue=0
-
-
-
-        ref_ph_lat{i}(1,:) = h5read(h5file{n}, "/" + beam + '/geolocation/reference_photon_lat'); % [-90 90] DOUBLE
-        ref_ph_lon{i}(1,:) = h5read(h5file{n}, "/" + beam + '/geolocation/reference_photon_lon'); % [-180 180] DOUBLE
+        GT_list{end+1} = GT; %#ok<AGROW>
     end
-    S(n).shape = geopointshape(ref_ph_lat, ref_ph_lon);
+    if isempty(GT_list)
+        fprintf('>>>>Skip granule %d due to [3] no enough ocean segments.\n', i);
+        continue
+    end
+    GT = vertcat(GT_list{:});
+    S(n).orbit_info = orb;
+    S(n).shape = geopointshape(GT.ref_ph_lat, GT.ref_ph_lon);
     S(n).shape.GeographicCRS = geocrs(4326);
+    n = n + 1;
 end
-elapsedTime = toc;
-fprintf('Finished processing %d granules in %s.\n', length(h5file), formatElapsedTime(elapsedTime));
 if inp.save_flag
     fprintf('Saving output to %s\n', output);
     save(output, 'S');
 end
-fprintf('+-----------------------------------------------------------------------------+\n');
-
 if nargout == 0
     clear S;
 end
 
 function orb = read_granule_info(h5file)
 % Read granule information from ATL03 HDF5 file
-orb.atl03_file = h5file;
+[~, filename, ~] = fileparts(h5file);
+tok = regexp(filename, '_(\d{8})_', 'tokens');
+orb.rcs = tok{1}{1}; % rgt cycle segment
 
 % get strong beams and check validity
 beam_list_l = {'gt1l' 'gt2l' 'gt3l'};
@@ -226,10 +221,12 @@ end
 assert(nnz(GT.ph_index_beg == 0) == 0 && nnz(GT.ref_ph_idx == 0) == 0, 'Error: Found fill values (0)');
 
 % Fine selection based on water depth and distance from the coastline
-GT.depth_ocn_seg = get_lonlat_elevation(GT.ref_ph_lon, GT.ref_ph_lat, 'GEBCO_2025'); % 15 arc-second
+GT.depth_ocn_seg = grdtrack(GT.ref_ph_lon, GT.ref_ph_lat, 'GEBCO_2025'); % 15 arc-second
 sloc = GT.depth_ocn_seg <= inp.depth;
 if ~isempty(inp.distance)
-    GT.dist_coast_seg = get_lonlat_dist2coast(GT.ref_ph_lon, GT.ref_ph_lat);
+    GT.dist_coast_seg = grdtrack(GT.ref_ph_lon, GT.ref_ph_lat, 'earth_dist_01m'); % 1 arc-minute
+    GT.dist_coast_seg = GT.dist_coast_seg * (-1); % >0: ocean to coastline
+    assert(inp.distance >= 0, 'Error: distance must be non-negative.');
     sloc = sloc & GT.dist_coast_seg >= inp.distance;
 end
 GT = GT(sloc, :);
@@ -266,15 +263,4 @@ gps_time = delta_time + atlas_sdp_gps_epoch;
 leap_seconds = 18; % as of 2017-01-01
 t0 = datetime(1980, 1, 6, 0, 0, 0, TimeZone='UTC');
 utc_time = t0 + seconds(gps_time - leap_seconds);
-end
-
-function elapsedTimeStr = formatElapsedTime(elapsedTime)
-% Format elapsed time (seconds) for display
-if elapsedTime < 60
-    elapsedTimeStr = sprintf('%.2f seconds', elapsedTime);
-elseif elapsedTime < 3600
-    elapsedTimeStr = sprintf('%.2f minutes', elapsedTime / 60);
-else
-    elapsedTimeStr = sprintf('%.2f hours', elapsedTime / 3600);
-end
 end
