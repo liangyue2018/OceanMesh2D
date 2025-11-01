@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -p xahcnormal
 #SBATCH -N 1
-#SBATCH --ntasks-per-node=32
+#SBATCH --ntasks-per-node=10
 
 # load matlab
 module load matlab-2022b-null
