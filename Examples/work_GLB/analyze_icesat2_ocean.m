@@ -52,16 +52,16 @@ assert(~isempty(h5file), 'ERROR: No h5 files in %s', filepath);
 S = struct();
 n = 1;
 for i = 1:length(h5file)
-    fprintf('Granule %d of %d: %s. ', i, length(h5file), h5file{i}(end-60:end));
+    fprintf('Granule %d of %d: %s ', i, length(h5file), h5file{i}(end-60:end));
 
     % Get orbit information
     orb = read_granule_info(h5file{i});
     if isempty(orb.beam_list)
-        fprintf('>>>>Skip granule %d due to [1] sparse data.\n', i);
+        fprintf('* Skip due to [1] sparse data.\n');
         continue
     end
     if orb.qa_flag == 1
-        fprintf('>>>>Skip granule %d due to [2] quality assessment failure.\n', i);
+        fprintf('* Skip due to [2] quality assessment failure.\n');
         continue
     end
 
@@ -76,10 +76,10 @@ for i = 1:length(h5file)
         GT_list{end+1} = GT; %#ok<AGROW>
     end
     if isempty(GT_list)
-        fprintf('>>>>Skip granule %d due to [3] no enough ocean segments.\n', i);
+        fprintf('* Skip due to [3] no enough ocean segments.\n');
         continue
     end
-    fprintf('Processed.\n');
+    fprintf('- Processed.\n');
     GT = vertcat(GT_list{:});
     S(n).orbit_info = orb;
     S(n).shape = geopointshape(GT.ref_ph_lat, GT.ref_ph_lon);
@@ -123,7 +123,7 @@ for gtx = orb.beam_list
         segment_length = h5read(h5file, "/" + gtx{1} + '/geolocation/segment_length'); % [meters] DOUBLE
         segment_ph_cnt = h5read(h5file, "/" + gtx{1} + '/geolocation/segment_ph_cnt'); % _FillValue=0
         surf_type = h5read(h5file, "/" + gtx + '/geolocation/surf_type', [2 1], [1 Inf]); % 5xN [0 1] [not-type is-type]
-        sloc = segment_ph_cnt > 0 & surf_type == 1;
+        sloc = segment_ph_cnt > 0 & surf_type(:) == 1;
         totalSegLen = sum(segment_length(sloc)) / 1000; % [km]
         assert(totalSegLen >= inp.oceanSegLen);
 
@@ -175,14 +175,15 @@ GT.Properties.Description = "Geolocation parameters and geophysical corrections 
 % Read datasets in /gtx/geolocation group
 GT.ph_index_beg = h5read(h5file, "/" + gtx + '/geolocation/ph_index_beg'); % _FillValue=0
 GT.podppd_flag = h5read(h5file, "/" + gtx + '/geolocation/podppd_flag'); % [0 1 2 3 4 5 6 7] [NOMINAL DEGRAGE ...]
-GT.ref_ph_idx = h5read(h5file, "/" + gtx + '/geolocation/ref_ph_idx'); % _FillValue=0
-GT.ref_ph_lat = h5read(h5file, "/" + gtx + '/geolocation/ref_ph_lat'); % [-90 90] DOUBLE
-GT.ref_ph_lon = h5read(h5file, "/" + gtx + '/geolocation/ref_ph_lon'); % [-180 180] DOUBLE
+GT.ref_ph_idx = h5read(h5file, "/" + gtx + '/geolocation/reference_photon_index'); % _FillValue=0
+GT.ref_ph_lat = h5read(h5file, "/" + gtx + '/geolocation/reference_photon_lat'); % [-90 90] DOUBLE
+GT.ref_ph_lon = h5read(h5file, "/" + gtx + '/geolocation/reference_photon_lon'); % [-180 180] DOUBLE
 GT.segment_dist_x = h5read(h5file, "/" + gtx + '/geolocation/segment_dist_x'); % [meters] DOUBLE
 GT.segment_id = h5read(h5file, "/" + gtx + '/geolocation/segment_id');
 GT.segment_length = h5read(h5file, "/" + gtx + '/geolocation/segment_length'); % [meters] DOUBLE
 GT.segment_ph_cnt = h5read(h5file, "/" + gtx + '/geolocation/segment_ph_cnt'); % _FillValue=0
-GT.surf_type = h5read(h5file, "/" + gtx + '/geolocation/surf_type', [2 1], [1 Inf]); % 5xN [0 1] [not-type is-type]
+surf_type = h5read(h5file, "/" + gtx + '/geolocation/surf_type', [2 1], [1 Inf]); % 5xN [0 1] [not-type is-type]
+GT.surf_type = surf_type(:);
 
 % Read datasets in /gtx/geophys_corr group
 GT.dac = h5read(h5file, "/" + gtx + '/geophys_corr/dac'); % [meters] FLOAT _FillValue=3.4028235E38
@@ -192,8 +193,7 @@ GT.geoid = h5read(h5file, "/" + gtx + '/geophys_corr/geoid'); % [meters] FLOAT _
 GT.geoid_free2mean = h5read(h5file, "/" + gtx + '/geophys_corr/geoid_free2mean'); % [meters] FLOAT _FillValue=3.4028235E38
 
 % Add dataset descriptions
-GT.Properties.VariableDescriptions = {'datetime UTC', ...
-                                      'Index of the first photon in a given segment', ...
+GT.Properties.VariableDescriptions = {'Index of the first photon in a given segment', ...
                                       'Flag indicates the quality of ATL03 geo-segments', ...
                                       'Index of the reference photon within a segment', ...
                                       'Latitude of the reference photon', ...
@@ -227,7 +227,6 @@ sloc = GT.depth_ocn_seg <= inp.depth;
 if ~isempty(inp.distance)
     GT.dist_coast_seg = grdtrack(GT.ref_ph_lon, GT.ref_ph_lat, 'earth_dist_01m'); % 1 arc-minute
     GT.dist_coast_seg = GT.dist_coast_seg * (-1); % >0: ocean to coastline
-    assert(inp.distance >= 0, 'Error: distance must be non-negative.');
     sloc = sloc & GT.dist_coast_seg >= inp.distance;
 end
 GT = GT(sloc, :);
@@ -244,7 +243,7 @@ if any(TF, 'all')
 end
 
 % Get MSS for each ocean segment
-GT.mss = get_lonlat_elevation(GT.ref_ph_lon, GT.ref_ph_lat, 'DTU21'); % 1 arc-minute
+GT.mss = grdtrack(GT.ref_ph_lon, GT.ref_ph_lat, 'DTU21'); % 1 arc-minute
 end
 
 %

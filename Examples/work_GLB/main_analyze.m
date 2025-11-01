@@ -4,14 +4,14 @@ yList = 2018;
 mList = 10;
 oceanSegLen = 10.24;
 depth = -10;
-distance = [];
+distance = 3;
 save_flag = 1;
 
 for year = yList
     for month = mList
         tic;
         fprintf('+-----------------------------------------------------------------------------+\n');
-        fprintf('Start processing ICESat-2 ATL03 granules for %04d-%02d...\n', year, month);
+        fprintf('Start processing ICESat-2 ATL03 granules for %04d-%02d\n', year, month);
         datestr = sprintf('%04d%02d**', year, month);
         S = analyze_icesat2_ocean(datestr,  'oceanSegLen', oceanSegLen, ...
                                             'depth', depth, ...
