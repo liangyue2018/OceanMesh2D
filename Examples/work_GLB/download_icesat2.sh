@@ -140,6 +140,7 @@ printf '%s\n' "${hrefs[@]}" >> "$url_list"
 sort -u "$url_list" -o "$url_list"
 
 format="%{http_code} %{time_total} %{size_download}\n"
+max_attempts=5
 h5_list=()
 for href in "${hrefs[@]}"; do
 	h5file="$save_dir/$(basename "$href")"
@@ -147,19 +148,36 @@ for href in "${hrefs[@]}"; do
 	if [ -s "$h5file" ]; then
 		continue
 	fi
-	metrics=$(curl -Lnbj -sS --fail \
-		--connect-timeout 30 \
-		--retry 5 --retry-delay 10 --retry-max-time 600 \
-		--speed-limit 1024 --speed-time 30 \
-		--write-out "$format" \
-		"$href" -o "$h5file")
-	curl_rc=$?
-	read -r http_code time_total size_download <<< "$metrics"
-	if [ $curl_rc -ne 0 ] || [ "$http_code" -ne 200 ]; then
-		echo "ERROR: Failed to download: $h5file" >&2
+
+	attempt=1
+	ok=0
+	while [ $attempt -le $max_attempts ]; do
+		metrics=$(curl -Lnbj -sS --fail \
+			--connect-timeout 30 \
+			--retry 5 --retry-delay 10 --retry-max-time 600 \
+			--speed-limit 1024 --speed-time 30 \
+			--write-out "$format" \
+			"$href" -o "$h5file")
+		curl_rc=$?
+		read -r http_code time_total size_download <<< "$metrics"
+		if [ $curl_rc -eq 0 ] && [ "$http_code" -eq 200 ]; then
+			ok=1
+			break
+		else
+			echo "WARNING: curl failed (rc=$curl_rc, http_code=${http_code:-NA}) for $h5file (attempt $attempt)."
+			rm -f "$h5file"
+		fi
+
+		sleep 30
+		attempt=$((attempt + 1))
+	done
+
+	if [ $ok -eq 0 ]; then
+		echo "ERROR: Failed to download after $max_attempts attempts: $h5file" >&2
 		rm -f "$h5file"
 		continue
 	fi
+
 	time_min=$(awk -v t="$time_total" 'BEGIN{printf "%.1f", t/60}')
 	size_mib=$(awk -v b="$size_download" 'BEGIN{printf "%.1f", b/1024/1024}')
 	printf "Downloaded %s (%.1f MiB) in %.1f minutes\n" "$h5file" "$size_mib" "$time_min"
@@ -174,6 +192,7 @@ if ! command -v h5ls >/dev/null 2>&1; then
 	fi
 fi
 invalid=()
+echo "Checking validity of downloaded files..."
 for fnm in "${h5_list[@]}"; do
 	if ! h5ls "$fnm" >/dev/null 2>&1; then
 		invalid+=("$fnm")
@@ -186,4 +205,6 @@ if [ ${#invalid[@]} -ne 0 ]; then
 	printf '    %s\n' "${invalid[@]}" >&2
 	echo "Run the script to download again:" >&2
 	echo "    bash $0 $start_date $end_date $shapefile $version $jobID" >&2
+else
+	echo "All downloaded files are valid."
 fi
