@@ -3,10 +3,11 @@
 # NASA Earthdata Login (~/_netrc)
 # curl
 #
-# Step 1: Parse start/end date (yyyyMMdd) and shape file
+# Step 1: Parse start/end date (yyyyMMdd), shape file and version
 start_date="$1"
 end_date="$2"
 shapefile="$3"
+version="$4"
 if ! [[ "$start_date" =~ ^[0-9]{8}$ ]] || ! [[ "$end_date" =~ ^[0-9]{8}$ ]]; then
 	echo "ERROR: Date format: [start_date(yyyyMMdd)] [end_date(yyyyMMdd)]" >&2
 	exit 1
@@ -15,20 +16,6 @@ if ! [[ -f "$shapefile" ]]; then
 	echo "ERROR: Shapefile not found: $shapefile" >&2
 	exit 1
 fi
-start_iso="${start_date:0:4}-${start_date:4:2}-${start_date:6:2}T00:00:00.000Z"
-end_iso="${end_date:0:4}-${end_date:4:2}-${end_date:6:2}T00:00:00.000Z"
-
-# set variables
-time_range="\"$start_iso\":\"$end_iso\""
-save_dir="./data/G${start_date:0:4}/${start_date:4:2}/${start_date:6:2}"
-version="006"
-
-echo "####Options:"
-echo "    time_range=$time_range"
-echo "    shapefile=$shapefile"
-echo "    save_dir=$save_dir"
-
-# Step 2: Build the URL for request
 if [ "$version" = "006" ]; then
 	cmr_id="C2596864127-NSIDC_CPRD"
 elif [ "$version" = "007" ]; then
@@ -37,23 +24,36 @@ else
 	echo "ERROR: Unsupported version: $version" >&2
 	exit 1
 fi
+start_iso="${start_date:0:4}-${start_date:4:2}-${start_date:6:2}T00:00:00.000Z"
+end_iso="${end_date:0:4}-${end_date:4:2}-${end_date:6:2}T00:00:00.000Z"
+
+# set variables
+time_range="\"$start_iso\":\"$end_iso\""
+save_dir="./data/ATL03_v$version/G${start_date:0:4}/${start_date:4:2}/${start_date:6:2}"
+
+echo "####Options:"
+echo "    time_range=$time_range"
+echo "    shapefile=$shapefile"
+echo "    save_dir=$save_dir"
+
+# Step 2: Build the URL for request
 variable="all"
 url="https://harmony.earthdata.nasa.gov/$cmr_id/\
 ogc-api-coverages/1.0.0/collections/$variable/coverage/\
-rangeset?forceAsync=true&subset=time($time_range)&skipPreview=true" #&maxResults=1
+rangeset?forceAsync=true&subset=time($time_range)&skipPreview=true&maxResults=1" #&maxResults=1
 
-if [ "$#" -eq 3 ]; then
+if [ "$#" -eq 4 ]; then
 	# Step 3: Submit the request and get the JSON response
 	response=$(curl -Lnbj -sS "$url" -F "shapefile=@$shapefile;type=application/shapefile+zip")
 	sleep 3
 	jobID=$(echo "$response" | jq -r '.jobID // empty')
-elif [ "$#" -eq 4 ]; then
+elif [ "$#" -eq 5 ]; then
 	# Get jobID from command line argument
-	jobID="$4"
+	jobID="$5"
 	response=$(curl -Lnbj -sS "https://harmony.earthdata.nasa.gov/jobs/$jobID")
 	sleep 3
 else
-	echo "ERROR: Usage: $0 <start_date> <end_date> <shapefile>" >&2
+	echo "ERROR: Usage: $0 <start_date> <end_date> <shapefile> <version> [<jobID>]" >&2
 	exit 1
 fi
 
@@ -68,6 +68,7 @@ echo "Job submitted successfully, jobID=$jobID"
 # construct job status URL
 numGrans=$(echo "$response" | jq -r '.numInputGranules')
 job_url="https://harmony.earthdata.nasa.gov/jobs/$jobID"
+set -x
 
 # wait until status is successful
 while :; do
@@ -89,7 +90,7 @@ while :; do
 		echo "Job completed successfully, achieved a $pct_reduction ($original_size -> $output_size)"
 		break
 	fi
-	if [ "$status" = "failed" ]; then
+	if [ "$status" = "failed" ] || [ "$status" = "complete_with_errors" ]; then
 		echo "ERROR: $message" >&2
 		exit 1
 	fi
@@ -127,6 +128,10 @@ for href in "${hrefs[@]}"; do
 	done
 done
 hrefs=("${filtered_hrefs[@]}")
+if [ "${#hrefs[@]}" -eq 0 ]; then
+	echo "INFO: No valid granules found for $shapefile" >&2
+	exit 0
+fi
 
 # Step 4: Download the results
 mkdir -p "$save_dir"
@@ -180,5 +185,5 @@ if [ ${#invalid[@]} -ne 0 ]; then
 	echo "ERROR: Expected ${#hrefs[@]} files, but has ${#invalid[@]} invalid file(s):" >&2
 	printf '    %s\n' "${invalid[@]}" >&2
 	echo "Run the script to download again:" >&2
-	echo "    bash $0 $start_date $end_date $shapefile $jobID" >&2
+	echo "    bash $0 $start_date $end_date $shapefile $version $jobID" >&2
 fi
