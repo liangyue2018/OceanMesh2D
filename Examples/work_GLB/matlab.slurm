@@ -4,7 +4,7 @@
 #SBATCH --ntasks-per-node=10
 
 # load matlab
-module load matlab-2024a-null
+module load matlab-2024a-none
 
 # check input
 if [ "$#" -ne 1 ]; then
