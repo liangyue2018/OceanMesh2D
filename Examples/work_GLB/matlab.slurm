@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -p xahcnormal
 #SBATCH -N 1
-#SBATCH --ntasks-per-node=10
+#SBATCH --ntasks-per-node=5
 
 # load matlab
 module load matlab-2024a-none

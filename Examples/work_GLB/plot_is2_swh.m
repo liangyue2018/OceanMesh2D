@@ -14,6 +14,9 @@ opts = detectImportOptions(fnm);
 opts = setvartype(opts, {'beam' 'rcs'}, {'string' 'string'});
 opts = setvaropts(opts, 'Time', TimeZone='UTC');
 TT = readtimetable(fnm, opts);
+loc = TT.missFrac == 0;
+TT = TT(loc, :);
+[~, idx] = max(TT.swh);
 
 % load coastal polygons
 load('coast_polygon_c.mat', 'shape', 'shapeout');
@@ -38,7 +41,8 @@ geoplot(gx, shapeout, FaceColor='none', ...
                       FaceAlpha=.5, ...
                       EdgeColor='k', ...
                       EdgeAlpha=.5);
-geoscatter(gx, TT.Lat, TT.Lon, ms, TT.swh, "filled");
+geoscatter(gx, TT.Lat, TT.Lon, ms, TT.swh, "filled", MarkerFaceAlpha=.5);
+geoscatter(gx, TT.Lat(idx), TT.Lon(idx), 5*ms, TT.swh(idx), 's', LineWidth=1.5, MarkerEdgeAlpha=.5);
 colormap(gx, 'jet');
 c = colorbar(gx);
 ylabel(c, '$H_{s}\ \mathrm{[m]}$', Interpreter='latex');
