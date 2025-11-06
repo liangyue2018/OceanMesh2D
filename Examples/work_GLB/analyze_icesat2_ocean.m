@@ -13,6 +13,7 @@ function TT = analyze_icesat2_ocean(datestr, varargin)
 %   'depth_threshold' - depth threshold used to filter geosegs (default: -10 m)
 %   'distance_threshold' - distance threshold from the coastline (km) used to filter geosegs (default: 3 km)
 %   'version' - ATL03 version, '006' or '007' (default: '006')
+%   'weight_threshold' - Threshold of photon weight parameter (default: 0.5)
 %   'bufWin' - half the height of the ocean surface buffer window (default: 20 m)
 %   'interval' - along-track spacing for resampling (default: 5 m)
 %   'method' - interpolation method for resampling (default: 'linear')
@@ -32,6 +33,7 @@ addParameter(p, 'oceanSegLen', 10.24, @(x) x > 0);
 addParameter(p, 'depth_threshold', -10, @(x) x <= 0);
 addParameter(p, 'distance_threshold', 3);
 addParameter(p, 'version', '006', @(x) ismember(x, {'006', '007'}));
+addParameter(p, 'weight_threshold', 0.2, @(x) x > 0 && x < 1);
 addParameter(p, 'bufWin', 20, @(x) x > 0);
 addParameter(p, 'interval', 5, @(x) x > 0);
 addParameter(p, 'method', 'linear', @(x) ismember(x, {'linear', 'pchip'}));
@@ -316,10 +318,10 @@ TH.lon_ph = h5read_block(h5file, "/" + gtx + '/heights/lon_ph', loc); % [-180 18
 TH.quality_ph = h5read_block(h5file, "/" + gtx + '/heights/quality_ph', loc); % '006': [0 1 2 3] [nominal ...], '007': [0 3 4 5 ...] [nominal tep noise-burst noise-streak]
 TH.signal_conf_ph = h5read_block(h5file, "/" + gtx + '/heights/signal_conf_ph', {2 loc}); % Nx1 [-2 -1 0 1 2 3 4] [TEP not-type noise background low med high]
 TH.weight_ph = h5read_block(h5file, "/" + gtx + '/heights/weight_ph', loc); % '006': [0 255], '007': [0 65535]
-
-% Update signal_class_ph for version '007'
 if strcmp(inp.version, '007')
-    TH.signal_class_ph = h5read_block(h5file, "/" + gtx + '/heights/signal_class_ph', loc); % [-1 0 1 2 3 4 5] [ignored likely-noise likely-signal ...]
+    TH.weight_ph = double(TH.weight_ph) / 65535;
+else
+    TH.weight_ph = double(TH.weight_ph) / 255;
 end
 
 % Add dataset descriptions
@@ -331,6 +333,12 @@ TH.Properties.VariableDescriptions = {'Along-track distance (meters) from the se
                                       'Confidence level associated with each photon event selected as signal', ...
                                       '* Calculated weight of each received photon (updated in 007)'};
 
+% Update signal_class_ph for version '007'
+if strcmp(inp.version, '007')
+    TH.signal_class_ph = h5read_block(h5file, "/" + gtx + '/heights/signal_class_ph', loc); % [-1 0 1 2 3 4 5] [ignored likely-noise likely-signal ...]
+    TH.Properties.VariableDescriptions{'signal_class_ph'} = '* Photon-rate flag based on evaluation of weight_ph';
+end
+
 % Asign geoseg-rate parameters to each photon
 TH.dist_ph_along = double(TH.dist_ph_along) + repelem(TG.segment_length .* double(TG.segment_id - TG.segment_id(1)), TG.segment_ph_cnt);
 TH = renamevars(TH, 'dist_ph_along', 'cum_dist_along');
@@ -341,7 +349,7 @@ TH.dist_ocn_seg = repelem(TG.dist_ocn_seg, TG.segment_ph_cnt);
 TH.mss = repelem(TG.mss, TG.segment_ph_cnt);
 
 % Select photon heights for med and high confidence, no saturation or at least signal-below (for version '007' only)
-loc = TH.signal_conf_ph >= 3 & TH.quality_ph == 0 & TH.weight_ph > 1;
+loc = TH.signal_conf_ph >= 3 & TH.quality_ph == 0 & TH.weight_ph > inp.weight_threshold;
 if strcmp(inp.version, '007')
     loc = loc & (TH.signal_class_ph >= 2);
 end
@@ -396,37 +404,42 @@ nSeg = numel(starts);
 if nSeg < 1
     return
 end
-
-% Resample the along-track photon height profile
-TH.h_ortho = sgolayfilt(double(TH.h_ortho), 5, 51); % frameLength = 51 * 0.7m = 35.7m
-vq = interp1(TH.cum_dist_along, TH.h_ortho, xq, inp.method, nan);
-assert(nnz(isnan(vq)) == 0, 'Error: Interpolation resulted in NaN values');
 qloc = check_gaps(TH.cum_dist_along, xq, inp.lackwidth);
 
 % calculate wave parameters for each overlapping ocean segment
 for k = 1:nSeg
     s = starts(k);
     e = ends(k);
-    xq_seg = xq(s:e);
-    vq_seg = vq(s:e);
+    xq_seg = xq(s:e); % 5m
 
     % set missing threshold
-    missFrac = nnz(qloc(s:e)) / numel(vq_seg);
+    missFrac = nnz(qloc(s:e)) / numel(xq_seg);
     if missFrac > inp.missing_threshold
         continue
     end
 
-    % get the mean time and location
+    % Remove outliers and use S-G filter
     loc = TH.cum_dist_along >= xq_seg(1) & TH.cum_dist_along < xq_seg(end);
+    x_seg = TH.cum_dist_along(loc); % 0.7m
+    v_seg = double(TH.h_ortho(loc));
+    tf = isoutlier(v_seg, "movmedian", 51, "SamplePoints", x_seg);
+    x_seg = x_seg(~tf);
+    v_seg = v_seg(~tf);
+    v_seg = sgolayfilt(v_seg, 5, 51);
+
+    % Resample the along-track photon height profile
+    vq_seg = interp1(x_seg, v_seg, xq_seg, inp.method, 0);
+    assert(nnz(isnan(vq_seg)) == 0, 'Error: Interpolation resulted in NaN values');
+
+    % get the mean time and location
     mtime = mean(posixtime(TH.utc_time(loc)));
     mtime = datetime(mtime, ConvertFrom='posixtime', TimeZone='UTC');
     mlon = mean(TH.lon_ph(loc));
     mlat = mean(TH.lat_ph(loc));
-    mdepth = mean(TH.depth_ocn_seg(loc));
-    mdist = mean(TH.dist_ocn_seg(loc));
+    mdepth = min(TH.depth_ocn_seg(loc));
+    mdist = min(TH.dist_ocn_seg(loc));
 
     % S-G filter and detrend
-    %vq_seg = sgolayfilt(vq_seg, 5, 7); % 7 * 5m = 35m
     vq_seg = detrend(vq_seg - mean(vq_seg));
     swh = 4 * std(vq_seg); % significant wave height
 
