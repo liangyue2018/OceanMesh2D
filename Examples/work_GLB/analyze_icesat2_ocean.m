@@ -156,8 +156,7 @@ for gtx = orb.beam_list
         segment_ph_cnt = h5read(h5file, "/" + gtx{1} + '/geolocation/segment_ph_cnt'); % _FillValue=0
         surf_type = h5read(h5file, "/" + gtx + '/geolocation/surf_type', [2 1], [1 Inf])'; % Nx1 [0 1] [not-type is-type]
         sloc = segment_ph_cnt > 0 & surf_type == 1;
-        totalSegLen = sum(segment_length(sloc)) / 1000; % [km]
-        assert(totalSegLen >= inp.oceanSegLen);
+        assert(check_length(segment_length(sloc), inp.oceanSegLen));
     catch
         orb.beam_list = setdiff(orb.beam_list, gtx);
     end
@@ -250,8 +249,7 @@ fillVal = realmax('single'); % 3.4028235e+38
 tf = ismissing(TG{:,chkVars}, fillVal);
 sloc = sloc & ~any(tf, 2);
 TG = TG(sloc, :);
-totalSegLen = sum(TG.segment_length) / 1000; % [km]
-if totalSegLen < inp.oceanSegLen
+if ~check_length(TG.segment_length, inp.oceanSegLen)
     TG = [];
     return
 end
@@ -270,8 +268,7 @@ if ~isempty(inp.distance_threshold)
     sloc = sloc & TG.dist_ocn_seg >= inp.distance_threshold;
 end
 TG = TG(sloc, :);
-totalSegLen = sum(TG.segment_length) / 1000; % [km]
-if totalSegLen < inp.oceanSegLen
+if ~check_length(TG.segment_length, inp.oceanSegLen)
     TG = [];
     return
 end
@@ -290,18 +287,23 @@ TH = timetable(utc_time);
 TH.Properties.Description = "Contains array of the parameters stored at" + newline + ...
                             "the photon detection rate for " + upper(gtx);
 
-% Get photon mask from the indicies of selected geosegs
-loc = false(height(TH), 1);
+% Filter extra geosegs in some cases
 begIdx = double(TG.ph_idx_beg); % unique to a specific granule
 endIdx = begIdx + double(TG.segment_ph_cnt) - 1;
 %refIdx = begIdx + double(TG.ref_ph_idx) - 1;
+sloc = begIdx > 0 & endIdx <= height(TH);
+TG = TG(sloc, :);
+if ~check_length(TG.segment_length, inp.oceanSegLen)
+    return
+end
+begIdx = max(1, begIdx(sloc));
+endIdx = min(endIdx(sloc), height(TH));
+
+% Get photon mask from the indicies of selected geosegs
+loc = false(height(TH), 1);
 for k = 1:height(TG)
     b = begIdx(k);
     e = endIdx(k);
-    if e > height(TH)
-        TG(k, :) = [];
-        continue
-    end
     loc(b:e) = true;
 end
 TH = TH(loc, :);
@@ -469,6 +471,13 @@ gps_time = delta_time + atlas_sdp_gps_epoch;
 leap_seconds = 18; % as of 2017-01-01
 t0 = datetime(1980, 1, 6, 0, 0, 0, TimeZone='UTC');
 utc_time = t0 + seconds(gps_time - leap_seconds);
+end
+
+function ok = check_length(segment_length, threshold)
+% Check if the segment length is above the threshold
+assert(isvector(segment_length) && isscalar(threshold), 'Error: Invalid inputs.');
+totalSegLen = sum(double(segment_length)) / 1000; % [km]
+ok = totalSegLen >= double(threshold);
 end
 
 function out = h5read_block(h5file, dataset, loc)
