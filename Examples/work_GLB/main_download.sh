@@ -7,16 +7,11 @@ for year in 2018; do
    	# for month in {01..12}; do
    	for month in 10; do
 		# for day in {01..31}; do
-		for day in 14; do
+		for day in {14..31}; do
 			# check if the date is valid
 			if ! date -d "${year}-${month}-${day}" >/dev/null 2>&1; then
 				continue
 			fi
-
-			# limit to Oct 14, 2018 for test
-			# if [ "$year" -ne 2018 ] || [ "$month" -ne 10 ] || [ "$day" -ne 14 ]; then
-			# 	continue
-			# fi
 
 			# set start/end date and version
 			start_date="${year}${month}${day}"

@@ -40,7 +40,7 @@ echo "    save_dir=$save_dir"
 variable="all"
 url="https://harmony.earthdata.nasa.gov/$cmr_id/\
 ogc-api-coverages/1.0.0/collections/$variable/coverage/\
-rangeset?forceAsync=true&subset=time($time_range)&skipPreview=true&maxResults=1" #&maxResults=1
+rangeset?forceAsync=true&subset=time($time_range)&skipPreview=true" #&maxResults=1
 
 if [ "$#" -eq 4 ]; then
 	# Step 3: Submit the request and get the JSON response

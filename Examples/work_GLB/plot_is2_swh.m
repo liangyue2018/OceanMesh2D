@@ -41,10 +41,8 @@ geoplot(gx, shapeout, FaceColor='none', ...
 geoscatter(gx, TT.Lat, TT.Lon, ms, TT.swh, "filled");
 colormap(gx, 'jet');
 c = colorbar(gx);
-c.Label.String = '$H_{s}\ \mathrm{[m]}$';
-set(c.Label, 'Interpreter', 'latex');
-%c.Label.Interpreter = 'latex';
-%geobasemap(gx, 'grayland');
+ylabel(c, '$H_{s}\ \mathrm{[m]}$', Interpreter='latex');
+geobasemap(gx, 'grayland');
 
 % set ticks
 %gx.LatitudeAxis.TickValues = [];

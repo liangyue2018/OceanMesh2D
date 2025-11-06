@@ -307,7 +307,7 @@ end
 TH = TH(loc, :);
 
 % Read datasets in /gtx/heights group
-TH.dist_ph_along = h5read_block(h5file, "/" + gtx + '/heights/dist_ph_along', loc); % [meters] DOUBLE
+TH.dist_ph_along = h5read_block(h5file, "/" + gtx + '/heights/dist_ph_along', loc); % [meters] FLOAT
 TH.h_ph = h5read_block(h5file, "/" + gtx + '/heights/h_ph', loc); % [meters] FLOAT
 TH.lat_ph = h5read_block(h5file, "/" + gtx + '/heights/lat_ph', loc); % [-90 90] FLOAT
 TH.lon_ph = h5read_block(h5file, "/" + gtx + '/heights/lon_ph', loc); % [-180 180] FLOAT
@@ -330,7 +330,7 @@ TH.Properties.VariableDescriptions = {'Along-track distance (meters) from the se
                                       '* Calculated weight of each received photon (updated in 007)'};
 
 % Asign geoseg-rate parameters to each photon
-TH.dist_ph_along = TH.dist_ph_along + repelem(TG.segment_length .* double(TG.segment_id - TG.segment_id(1)), TG.segment_ph_cnt);
+TH.dist_ph_along = double(TH.dist_ph_along) + repelem(TG.segment_length .* double(TG.segment_id - TG.segment_id(1)), TG.segment_ph_cnt);
 TH = renamevars(TH, 'dist_ph_along', 'cum_dist_along');
 TH.h_ph = TH.h_ph - repelem(TG.dac + TG.tide_equilibrium + TG.tide_ocean, TG.segment_ph_cnt);
 TH.geoid_mean = repelem(TG.geoid + TG.geoid_free2mean, TG.segment_ph_cnt);
