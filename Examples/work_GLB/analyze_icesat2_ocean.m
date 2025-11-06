@@ -339,7 +339,7 @@ TH.dist_ocn_seg = repelem(TG.dist_ocn_seg, TG.segment_ph_cnt);
 TH.mss = repelem(TG.mss, TG.segment_ph_cnt);
 
 % Select photon heights for med and high confidence, no saturation or at least signal-below (for version '007' only)
-loc = TH.signal_conf_ph >= 3 & TH.quality_ph == 0;
+loc = TH.signal_conf_ph >= 3 & TH.quality_ph == 0 & TH.weight_ph > 1;
 if strcmp(inp.version, '007')
     loc = loc & (TH.signal_class_ph >= 2);
 end
@@ -365,6 +365,10 @@ TH = TH(:, {'cum_dist_along', 'h_ortho', 'lat_ph', 'lon_ph', 'depth_ocn_seg', 'd
 TH = TH(ia, :);
 [~, ia] = unique(TH.cum_dist_along);
 TH = TH(ia, :);
+if height(TH) < inp.oceanSegLen * 1000 / 0.7
+    TH = [];
+    return
+end
 end
 
 function T = calc_wave_params(TH)
