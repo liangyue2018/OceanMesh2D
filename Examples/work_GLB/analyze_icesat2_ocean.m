@@ -48,10 +48,10 @@ inp = p.Results;
 % define filepath
 if all(isstrprop(datestr, 'digit')) % yyyyMMdd
     filepath = fullfile('data', "ATL03_v" + inp.version, "G" + datestr(1:4), datestr(5:6), datestr(7:8));
-    output = sprintf('icesat2_atl03_%s_v%s.csv', datestr, inp.version);
+    output = fullfile('results', "ATL03_v" + inp.version, sprintf('icesat2_atl03_%s_v%s.csv', datestr, inp.version));
 elseif strcmp(datestr(7:8), '**') % yyyyMM**
     filepath = fullfile('data', "ATL03_v" + inp.version, "G" + datestr(1:4), datestr(5:6), '*');
-    output = sprintf('icesat2_atl03_%s_v%s.csv', datestr(1:6), inp.version);
+    output = fullfile('results', "ATL03_v" + inp.version, sprintf('icesat2_atl03_%s_v%s.csv', datestr(1:6), inp.version));
 else
     error('ERROR: Invalid datestr format.');
 end
@@ -59,7 +59,10 @@ end
 % get filenames
 fstruct = dir(fullfile(filepath, '*.h5'));
 h5file = fullfile({fstruct.folder}', {fstruct.name}');
-assert(~isempty(h5file), 'ERROR: No h5 files in %s', filepath);
+if isempty(h5file)
+    TT = [];
+    return
+end
 
 % read h5files
 TCell = cell(3*length(h5file),1);
@@ -112,7 +115,10 @@ for i = 1:length(h5file)
     end
     fprintf('- Processed %d records.\n', numRows);
 end
-assert(count > 0, 'ERROR: No valid records found.');
+if count == 0
+    TT = [];
+    return
+end
 TCell = TCell(1:count);
 T = vertcat(TCell{:});
 TT = table2timetable(T);
@@ -120,6 +126,9 @@ TT = table2timetable(T);
 % save results
 if inp.save_flag
     fprintf('Saving results to %s\n', output);
+    if ~exist(fileparts(output), 'dir')
+        mkdir(fileparts(output));
+    end
     writetimetable(TT, output);
 end
 if nargout == 0
