@@ -10,10 +10,10 @@ weight_threshold = 0.2; % 0.03 for v007
 bufWin = 20; % [m]
 interval = 5; % [m]
 method = 'linear';
-lackwidth = 60; % [m]
-missing_threshold = 0.2;
+lackwidth = 20; % [m]
+missing_threshold = 0.01;
 psd_flag = false;
-save_flag = 1;
+save_flag = false;
 
 for year = yList
     for month = mList

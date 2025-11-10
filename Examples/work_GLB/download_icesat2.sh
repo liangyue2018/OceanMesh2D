@@ -72,7 +72,7 @@ job_url="https://harmony.earthdata.nasa.gov/jobs/$jobID"
 # wait until status is successful
 while :; do
 	tmp=$(mktemp)
-	http_code=$(curl -Lnbj -sS -w "%{http_code}" -o "$tmp" "$job_url")
+	http_code=$(curl -Lnbj -sS -w "%{http_code}" -o "$tmp" "$job_url" 2>/dev/null)
 	curl_rc=$?
 	if [ "$http_code" -ne 200 ] || [ $curl_rc -ne 0 ]; then
 		sleep 60
@@ -156,7 +156,7 @@ for href in "${hrefs[@]}"; do
 			--retry 5 --retry-delay 10 --retry-max-time 600 \
 			--speed-limit 1024 --speed-time 30 \
 			--write-out "$format" \
-			"$href" -o "$h5file")
+			"$href" -o "$h5file" 2>/dev/null)
 		curl_rc=$?
 		read -r http_code time_total size_download <<< "$metrics"
 		if [ $curl_rc -eq 0 ] && [ "$http_code" -eq 200 ]; then

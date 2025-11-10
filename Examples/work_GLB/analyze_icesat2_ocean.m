@@ -17,10 +17,10 @@ function TT = analyze_icesat2_ocean(datestr, varargin)
 %   'bufWin' - half the height of the ocean surface buffer window (default: 20 m)
 %   'interval' - along-track spacing for resampling (default: 5 m)
 %   'method' - interpolation method for resampling (default: 'linear')
-%   'lackwidth' - lackwidth for checking data gaps (default: 60 m)
-%   'missing_threshold' - maximum fraction of missing data allowed (default: 0.2)
+%   'lackwidth' - lackwidth for checking data gaps (default: 20 m)
+%   'missing_threshold' - maximum fraction of missing data allowed (default: 0.01)
 %   'psd_flag' - true or false (default: false)
-%   'save_flag' - 0 or 1 (default: 1)
+%   'save_flag' - true or false (default: true)
 %
 % Outputs:
 %   TT - timetable containing wave parameters (SWH) retrieved from ICESat-2 ATL03 geolocated photon data
@@ -37,10 +37,10 @@ addParameter(p, 'weight_threshold', 0.2, @(x) x > 0 && x < 1);
 addParameter(p, 'bufWin', 20, @(x) x > 0);
 addParameter(p, 'interval', 5, @(x) x > 0);
 addParameter(p, 'method', 'linear', @(x) ismember(x, {'linear', 'pchip'}));
-addParameter(p, 'lackwidth', 60, @(x) x > 0);
-addParameter(p, 'missing_threshold', 0.2, @(x) x > 0 && x < 1);
+addParameter(p, 'lackwidth', 20, @(x) x > 0);
+addParameter(p, 'missing_threshold', 0.01, @(x) x > 0 && x < 1);
 addParameter(p, 'psd_flag', false, @(x) islogical(x));
-addParameter(p, 'save_flag', 1, @(x) ismember(x, [0 1]));
+addParameter(p, 'save_flag', true, @(x) islogical(x));
 
 parse(p, varargin{:});
 inp = p.Results;
@@ -392,10 +392,13 @@ if inp.psd_flag
     types = [types 'double'];
 end
 T = table('Size', [0 numel(names)], 'VariableTypes', types, 'VariableNames', names);
+T.Time.Format = 'uuuu-MM-dd HH:mm:ss';
 T.Time.TimeZone = 'UTC';
 
 % Define resampling grid
-xq = TH.cum_dist_along(1):inp.interval:TH.cum_dist_along(end);
+x = TH.cum_dist_along;
+v = double(TH.h_ortho);
+xq = x(1):inp.interval:x(end);
 oceanSegPts = floor(inp.oceanSegLen * 1000 / inp.interval) + 1;
 stepPts = floor((oceanSegPts - 1) / 2);
 starts = 1:stepPts:(numel(xq) - oceanSegPts + 1);
@@ -404,13 +407,25 @@ nSeg = numel(starts);
 if nSeg < 1
     return
 end
-qloc = check_gaps(TH.cum_dist_along, xq, inp.lackwidth);
+qloc = check_gaps(x, xq, inp.lackwidth);
+
+% Remove outliers and use S-G filter
+tf = isoutlier(v, "median", ThresholdFactor=5);
+x = x(~tf);
+v = v(~tf);
+v = sgolayfilt(v, 5, 51);
+
+% Resample the along-track photon height profile
+vq = interp1(x, v, xq, inp.method, NaN);
+assert(nnz(isnan(vq)) == 0, 'Error: Interpolation resulted in NaN values');
 
 % calculate wave parameters for each overlapping ocean segment
 for k = 1:nSeg
     s = starts(k);
     e = ends(k);
     xq_seg = xq(s:e); % 5m
+    loc = x >= xq_seg(1) & x < xq_seg(end);
+    vq_seg = vq(s:e);
 
     % set missing threshold
     missFrac = nnz(qloc(s:e)) / numel(xq_seg);
@@ -418,25 +433,12 @@ for k = 1:nSeg
         continue
     end
 
-    % Remove outliers and use S-G filter
-    loc = TH.cum_dist_along >= xq_seg(1) & TH.cum_dist_along < xq_seg(end);
-    x_seg = TH.cum_dist_along(loc); % 0.7m
-    v_seg = double(TH.h_ortho(loc));
-    tf = isoutlier(v_seg, "movmedian", 51, "SamplePoints", x_seg);
-    x_seg = x_seg(~tf);
-    v_seg = v_seg(~tf);
-    v_seg = sgolayfilt(v_seg, 5, 51);
-
-    % Resample the along-track photon height profile
-    vq_seg = interp1(x_seg, v_seg, xq_seg, inp.method, 0);
-    assert(nnz(isnan(vq_seg)) == 0, 'Error: Interpolation resulted in NaN values');
-
     % get the mean time and location
     mtime = mean(posixtime(TH.utc_time(loc)));
     mtime = datetime(mtime, ConvertFrom='posixtime', TimeZone='UTC');
     mlon = mean(TH.lon_ph(loc));
     mlat = mean(TH.lat_ph(loc));
-    mdepth = min(TH.depth_ocn_seg(loc));
+    mdepth = max(TH.depth_ocn_seg(loc));
     mdist = min(TH.dist_ocn_seg(loc));
 
     % S-G filter and detrend

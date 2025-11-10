@@ -1,4 +1,4 @@
-function plot_is2_swh(datestr, version, save_flag)
+function TT = plot_is2_swh(datestr, version, save_flag)
 % Visualize the coastal SWH records derived from ICESat-2 altimetry.
 %
 % Check input:
@@ -26,9 +26,14 @@ fig = figure(Units="inches");
 fig.Position(3) = 10;
 fig.Position(4) = 5;
 fsz = 12;
-ms = 10;
-latlim = [-60 66];
-lonlim = [-180 180];
+ms = 5;
+limit = [0 round(prctile(TT.swh, 99))];
+cmap = 'jet';
+clbl = '$H_{s}\ \mathrm{[m]}$';
+xtks = -180:60:180;
+ytks = -60:30:66;
+lonlim = [min(xtks) max(xtks)];
+latlim = [min(ytks) max(ytks)];
 
 % plot
 gx = geoaxes;
@@ -41,16 +46,17 @@ geoplot(gx, shapeout, FaceColor='none', ...
                       FaceAlpha=.5, ...
                       EdgeColor='k', ...
                       EdgeAlpha=.5);
-geoscatter(gx, TT.Lat, TT.Lon, ms, TT.swh, "filled", MarkerFaceAlpha=.5);
-geoscatter(gx, TT.Lat(idx), TT.Lon(idx), 5*ms, TT.swh(idx), 's', LineWidth=1.5, MarkerEdgeAlpha=.5);
-colormap(gx, 'jet');
-c = colorbar(gx);
-ylabel(c, '$H_{s}\ \mathrm{[m]}$', Interpreter='latex');
+geoscatter(gx, TT.Lat, TT.Lon, ms, TT.swh, "filled", MarkerFaceAlpha=.25);
+geoscatter(gx, TT.Lat(idx), TT.Lon(idx), 15*ms, TT.swh(idx), 'p', LineWidth=1.5, MarkerEdgeAlpha=1);
 geobasemap(gx, 'grayland');
+clim(gx, limit);
+colormap(gx, cmap);
+c = colorbar(gx);
+ylabel(c, clbl, Interpreter='latex');
 
 % set ticks
-%gx.LatitudeAxis.TickValues = [];
-%gx.LongitudeAxis.TickValues = [];
+gx.LongitudeAxis.TickValues = xtks;
+gx.LatitudeAxis.TickValues = ytks;
 geotickformat(gx, 'dd');
 geolimits(gx, latlim, lonlim);
 gx.LatitudeAxis.FontSize = fsz;
