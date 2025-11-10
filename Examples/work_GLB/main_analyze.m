@@ -13,7 +13,7 @@ method = 'linear';
 lackwidth = 20; % [m]
 missing_threshold = 0.01;
 psd_flag = false;
-save_flag = false;
+save_flag = true;
 
 for year = yList
     for month = mList
