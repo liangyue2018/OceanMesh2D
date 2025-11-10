@@ -404,9 +404,14 @@ T = table('Size', [0 numel(names)], 'VariableTypes', types, 'VariableNames', nam
 T.Time.Format = 'uuuu-MM-dd HH:mm:ss';
 T.Time.TimeZone = 'UTC';
 
-% Define resampling grid
+% Remove outliers using median filtering
 x = TH.cum_dist_along;
 v = double(TH.h_ortho);
+tf = isoutlier(v, "median", ThresholdFactor=5);
+x = x(~tf);
+v = v(~tf);
+
+% Define resampling grid
 xq = x(1):inp.interval:x(end);
 oceanSegPts = floor(inp.oceanSegLen * 1000 / inp.interval) + 1;
 stepPts = floor((oceanSegPts - 1) / 2);
@@ -418,13 +423,8 @@ if nSeg < 1
 end
 qloc = check_gaps(x, xq, inp.lackwidth);
 
-% Remove outliers and use S-G filter
-tf = isoutlier(v, "median", ThresholdFactor=5);
-x = x(~tf);
-v = v(~tf);
+% Apply S-G filter and 1D along-track sampling
 v = sgolayfilt(v, 5, 51);
-
-% Resample the along-track photon height profile
 vq = interp1(x, v, xq, inp.method, NaN);
 assert(nnz(isnan(vq)) == 0, 'Error: Interpolation resulted in NaN values');
 
