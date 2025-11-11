@@ -125,11 +125,11 @@ TT = table2timetable(T);
 
 % save results
 if inp.save_flag
-    fprintf('Saving results to %s\n', output);
+    fprintf('# Saving results to %s\n', output);
     if ~exist(fileparts(output), 'dir')
         mkdir(fileparts(output));
     end
-    writetimetable(TT, output);
+    writetimetable(TT, output, DateLocale='en_US');
 end
 if nargout == 0
     clear TT;

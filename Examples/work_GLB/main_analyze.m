@@ -50,6 +50,23 @@ for year = yList
                                                 'psd_flag', psd_flag, ...
                                                 'save_flag', save_flag);
             end
+
+            % concatenate results
+            results = fullfile('results', "ATL03_v" + version, sprintf('icesat2_atl03_%04d%02d??_v%s.csv', year, month, version));
+            fstruct = dir(results);
+            cfile = fullfile({fstruct.folder}', {fstruct.name}');
+            TT_month = cell(numel(cfile),1);
+            for k = 1:numel(cfile)
+                opts = detectImportOptions(cfile{k});
+                opts = setvartype(opts, {'beam' 'rcs'}, {'string' 'string'});
+                opts = setvaropts(opts, 'Time', InputFormat='uuuu-MM-dd HH:mm:ss', TimeZone='UTC');
+                TT = readtimetable(cfile{k}, opts);
+                TT_month{k} = TT;
+            end
+            TT_month = vertcat(TT_month{:});
+            outfnm = fullfile('results', "ATL03_v" + version, sprintf('icesat2_atl03_%04d%02d_v%s.csv', year, month, version));
+            writetimetable(TT_month, outfnm, DateLocale='en_US');
+            delete(results);
         else
             datestr = sprintf('%04d%02d**', year, month);
             analyze_icesat2_ocean(datestr,  'oceanSegLen', oceanSegLen, ...
