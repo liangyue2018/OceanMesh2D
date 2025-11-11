@@ -52,21 +52,7 @@ for year = yList
             end
 
             % concatenate results
-            results = fullfile('results', "ATL03_v" + version, sprintf('icesat2_atl03_%04d%02d??_v%s.csv', year, month, version));
-            fstruct = dir(results);
-            cfile = fullfile({fstruct.folder}', {fstruct.name}');
-            TT_month = cell(numel(cfile),1);
-            for k = 1:numel(cfile)
-                opts = detectImportOptions(cfile{k});
-                opts = setvartype(opts, {'beam' 'rcs'}, {'string' 'string'});
-                opts = setvaropts(opts, 'Time', InputFormat='uuuu-MM-dd HH:mm:ss', TimeZone='UTC');
-                TT = readtimetable(cfile{k}, opts);
-                TT_month{k} = TT;
-            end
-            TT_month = vertcat(TT_month{:});
-            outfnm = fullfile('results', "ATL03_v" + version, sprintf('icesat2_atl03_%04d%02d_v%s.csv', year, month, version));
-            writetimetable(TT_month, outfnm, DateLocale='en_US');
-            delete(results);
+            concat_results(year, month, version);
         else
             datestr = sprintf('%04d%02d**', year, month);
             analyze_icesat2_ocean(datestr,  'oceanSegLen', oceanSegLen, ...
@@ -99,4 +85,32 @@ elseif elapsedTime < 3600
 else
     elapsedTimeStr = sprintf('%.2f hours', elapsedTime / 3600);
 end
+end
+
+function concat_results(year, month, version)
+% Concatenate results for a given year and month with specified version
+save_dir = fullfile('results', "ATL03_v" + version);
+pattern = sprintf('icesat2_atl03_%04d%02d*_v%s.csv', year, month, version);
+fstruct = dir(fullfile(save_dir, pattern));
+if ~isempty(fstruct)
+    names = {fstruct.name}';
+    rx = sprintf('^icesat2_atl03_%04d%02d\\d{2}_v%s\\.csv$', year, month, version);
+    ok = ~cellfun(@isempty, regexp(names, rx));
+    fstruct = fstruct(ok);
+end
+cfile = fullfile({fstruct.folder}', {fstruct.name}');
+TT_month = cell(numel(cfile),1);
+for k = 1:numel(cfile)
+    opts = detectImportOptions(cfile{k});
+    opts = setvartype(opts, {'beam' 'rcs'}, {'string' 'string'});
+    opts = setvaropts(opts, 'Time', InputFormat='uuuu-MM-dd HH:mm:ss', TimeZone='UTC');
+    TT = readtimetable(cfile{k}, opts);
+    TT_month{k} = TT;
+    delete(cfile{k});
+end
+TT_month = vertcat(TT_month{:});
+
+% save
+outfnm = fullfile(save_dir, sprintf('icesat2_atl03_%04d%02d_v%s.csv', year, month, version));
+writetimetable(TT_month, outfnm, DateLocale='en_US');
 end
