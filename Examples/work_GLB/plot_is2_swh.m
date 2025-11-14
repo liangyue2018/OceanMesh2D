@@ -9,10 +9,10 @@ end
 assert(ischar(datestr) && length(datestr) == 6, 'Error: Invalid date string.');
 
 % load timetable
-fnm = sprintf('icesat2_atl03_%s_v%s.csv', datestr, version);
+fnm = fullfile('results', "ATL03_v" + version, sprintf('icesat2_atl03_%s_v%s.csv', datestr, version));
 opts = detectImportOptions(fnm);
 opts = setvartype(opts, {'beam' 'rcs'}, {'string' 'string'});
-opts = setvaropts(opts, 'Time', TimeZone='UTC');
+opts = setvaropts(opts, 'Time', InputFormat='uuuu-MM-dd HH:mm:ss', TimeZone='UTC');
 TT = readtimetable(fnm, opts);
 loc = TT.missFrac == 0;
 TT = TT(loc, :);
@@ -70,4 +70,7 @@ if save_flag
     exportgraphics(fig, sfnm, Resolution=900);
 end
 
+if nargout == 0
+    clear TT;
+end
 end

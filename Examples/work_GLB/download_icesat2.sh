@@ -32,9 +32,9 @@ time_range="\"$start_iso\":\"$end_iso\""
 save_dir="./data/ATL03_v$version/G${start_date:0:4}/${start_date:4:2}/${start_date:6:2}"
 
 echo "####Options:"
-echo "    time_range=$time_range"
-echo "    shapefile=$shapefile"
-echo "    save_dir=$save_dir"
+echo "    time_range = $time_range"
+echo "    shapefile = $shapefile"
+echo "    save_dir = $save_dir"
 
 # Step 2: Build the URL for request
 variable="all"
@@ -97,7 +97,7 @@ while :; do
 	sleep 60
 done
 
-# extract download links whose title or href matches ATL03_*.h5
+# extract download links (href) whose title matches ATL03_*.h5
 mapfile -t hrefs < <(echo "$status_json" | \
 jq -r '.links | .[] | select(.title | test("ATL03_.*\\.h5")) | .href' | \
 tr -d '\r')
@@ -184,10 +184,10 @@ done
 
 # Step 5: Check the validity of downloaded files
 if ! command -v h5ls >/dev/null 2>&1; then
-	if [ "$(basename "$HOME")" = "caolang" ]; then
-		eval "$(conda shell.bash hook)" && conda activate icepyx_env
-	elif [ "$(basename "$HOME")" = "ac6vfo7a3a" ]; then
+	if [ "$(basename "$HOME")" = "ac6vfo7a3a" ]; then
 		module load mathlib/hdf5/1.12.2-intel-21
+	else
+		eval "$(conda shell.bash hook)" && conda activate wave
 	fi
 fi
 invalid=()
@@ -202,7 +202,7 @@ done
 if [ ${#invalid[@]} -ne 0 ]; then
 	echo "ERROR: Expected ${#hrefs[@]} files, but has ${#invalid[@]} invalid file(s):" >&2
 	printf '    %s\n' "${invalid[@]}" >&2
-	echo "Run the script to download again:" >&2
+	echo "Run the following command to retry:" >&2
 	echo "    bash $0 $start_date $end_date $shapefile $version $jobID" >&2
 else
 	echo "All downloaded files are valid."

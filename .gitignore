@@ -4,7 +4,8 @@ datasets/
 imgs/
 Tests/
 UserGuide/
-Examples/project_TW/*
+Examples/project_TW/
+__pycache__/
 
 # large data
 *.mat
@@ -16,6 +17,7 @@ Examples/project_TW/*
 *.txt
 *.csv
 *.pdf
+*.xlsx
 
 # shapefile
 *.shp
