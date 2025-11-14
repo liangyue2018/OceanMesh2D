@@ -233,6 +233,3 @@ if __name__ == "__main__":
                 print(f"Total time taken: {formatElapsedTime(toc - tic)}")
                 print(f"+{'-' * 84}+")
             print(f"* Completed all downloads for {year}-{month}!")
-
-
-
