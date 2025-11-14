@@ -232,7 +232,7 @@ if __name__ == "__main__":
                 toc = time.time()
                 print(f"Total time taken: {formatElapsedTime(toc - tic)}")
                 print(f"+{'-' * 84}+")
-        print(f"* Completed all downloads for {year}-{month}!")
+            print(f"* Completed all downloads for {year}-{month}!")
 
 
 
