@@ -3,11 +3,11 @@
 # download_icesat2.sh
 
 # for year in {2018..2025}; do
-for year in 2018; do
+for year in 2023; do
    	# for month in {01..12}; do
-   	for month in 10; do
+   	for month in 01; do
 		# for day in {01..31}; do
-		for day in {26..31}; do
+		for day in {01..31}; do
 			# check if the date is valid
 			if ! date -d "${year}-${month}-${day}" >/dev/null 2>&1; then
 				continue
@@ -16,7 +16,7 @@ for year in 2018; do
 			# set start/end date and version
 			start_date="${year}${month}${day}"
 			end_date=$(date -d "${year}-${month}-${day} + 1 day" +"%Y%m%d")
-			version="006"
+			version="007"
 			tic=$(date +%s)
 			echo "------------------------------------------------------------------------------------------------"
 			echo "INFO: Start downloading ICESat-2 ATL03 v$version data for $start_date to $end_date at $(date "+%Y-%m-%d %H:%M:%S")"

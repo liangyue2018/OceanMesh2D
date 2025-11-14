@@ -3,7 +3,7 @@ function TT = plot_is2_swh(datestr, version, save_flag)
 %
 % Check input:
 if nargin < 2
-    version = '006';
+    version = '007';
     save_flag = false;
 end
 assert(ischar(datestr) && length(datestr) == 6, 'Error: Invalid date string.');

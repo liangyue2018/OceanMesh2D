@@ -32,8 +32,9 @@ shapeoutC = make_coast_polygon(reso, bbox, bufwidth, tol, 'min_area', min_area, 
 oceanSegLen = 10.24; % [km]
 depth_threshold = -10; % [m]
 distance_threshold = 3; % [km]
-version = '006';
-weight_threshold = 0.2; % 0.03 for v007
+version = '007';
+%weight_threshold = 0.2; % for v006
+weight_threshold = 0.03; % for v007
 bufWin = 20; % [m]
 interval = 5; % [m]
 method = 'linear';
@@ -62,7 +63,7 @@ end %[output:group:4b487548]
 %%
 %[text] ## 1.4 Visualization
 datestr = '201810';
-version = '006';
+version = '007';
 save_flag = false;
 
 TT = plot_is2_swh(datestr, version, save_flag); %[output:6cef280d]
