@@ -31,8 +31,8 @@ fi
 source ~/load_modules.sh || { echo "ERROR: Failed to load modules"; exit 1; }
 
 # Optionally set compiler and env vars to locate libraries
-export CC=mpicc
-export FC=mpifort
+export CC=mpiicc
+export FC=mpiifort
 export NetCDF_ROOT=/public/software/mathlib/netcdf/4.4.1/intel
 export ParMETIS_ROOT=$HOME/soft/ParMetis
 

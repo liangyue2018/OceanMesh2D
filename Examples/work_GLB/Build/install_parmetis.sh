@@ -8,8 +8,8 @@ PARMETIS_INSTALL=/work/home/ac6vfo7a3a/soft/ParMetis
 #   * MPI
 export CFLAGS=-fPIC
 source ~/load_modules.sh
-CC=mpicc
-CXX=mpicxx
+CC=mpiicc
+CXX=mpiicc
 
 # Check install dir
 mkdir -p $PARMETIS_INSTALL
